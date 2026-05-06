@@ -131,8 +131,8 @@ Prerequisites:
 """
 function performanceDiagram(outputFile::String)
 
-    resultFolder = "../res/"
-    
+    resultFolder = "res/"
+
     maxSize = 0
     subfolderCount = 0
     folderName = Array{String, 1}()
@@ -228,8 +228,8 @@ Prerequisites:
 """
 function resultsArray(outputFile::String)
     
-    resultFolder = "../res/"
-    dataFolder   = "../data/"
+    resultFolder = "res/"
+    dataFolder   = "data/"
     
     maxSize = 0
     subfolderCount = 0

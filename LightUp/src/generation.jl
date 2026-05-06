@@ -60,14 +60,14 @@ Generate a dataset of LightUp instances and save them to ../data/.
 """
 function generateDataSet()
 
-    dataFolder = "../data/"
+    dataFolder = "data/"
 
     if !isdir(dataFolder)
         mkpath(dataFolder)
     end
 
     sizes       = [4, 5, 6, 7, 8, 10, 12, 15]
-    nbInstances = 5
+    nbInstances = 20
 
     for n in sizes
         for k in 1:nbInstances

@@ -155,8 +155,8 @@ Each result file contains: solveTime and isOptimal
 """
 function solveDataSet()
 
-    dataFolder = "../data/"
-    resFolder  = "../res/"
+    dataFolder = "data/"
+    resFolder  = "res/"
 
     resolutionMethod = ["cplex"]
     resolutionFolder = resFolder .* resolutionMethod
