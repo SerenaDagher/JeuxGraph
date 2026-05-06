@@ -1,182 +1,176 @@
-include("resolution.jl")
-using Random
+# This file contains methods to generate Filling instances
 
-# ==============================================================================
-# generation.jl — Génération d'instances aléatoires pour Filling
-# ==============================================================================
-#
-# Principe de génération :
-#   1. On génère d'abord une solution valide (grille complète) :
-#      - On parcourt les cases dans un ordre aléatoire.
-#      - Pour chaque case non encore affectée, on choisit une valeur k
-#        et on tente d'étendre une zone connexe de taille k à partir de cette case.
-#      - Si ce n'est pas possible (pas assez de cases libres adjacentes),
-#        on essaie une autre valeur.
-#   2. On cache ensuite une partie des cases (on met 0) pour créer l'instance.
-#
-# Note : les instances générées ne sont pas nécessairement à solution unique.
-# ==============================================================================
+include("io.jl")
+
+# ---------------------------------------------------------------------------
+# Solution generator
+# ---------------------------------------------------------------------------
 
 """
-Génère une grille Filling valide de taille n×m en utilisant un remplissage
-glouton aléatoire.
+Generate a valid complete Filling grid of size n×m.
+
+Strategy:
+  - Grow connected regions one by one using BFS from a random seed.
+  - Each region's value = its actual size.
+  - When choosing a value for a new region, avoid values already used by
+    adjacent assigned regions (to prevent two same-value regions touching).
+
+Arguments:
+  - n, m   : grid dimensions
+  - maxVal : maximum allowed value for a region (default 6)
+
+Returns: sol (n×m Array{Int,2})
 """
-function generateValidGrid(n::Int, m::Int, maxK::Int, rng::AbstractRNG)
-    assign = zeros(Int, n, m)
+function generateSolution(n::Int, m::Int, maxVal::Int = 6)
+    grid = zeros(Int, n, m)
+    remaining = Set{Tuple{Int,Int}}([(i, j) for i in 1:n for j in 1:m])
 
-    # Parcourir les cases dans un ordre aléatoire
-    cells = shuffle(rng, [(i,j) for i in 1:n, j in 1:m])
+    while !isempty(remaining)
+        # Pick a random unassigned starting cell
+        start = rand(collect(remaining))
 
-    function freeNeighbors(i, j)
-        nb = Tuple{Int,Int}[]
-        for (di,dj) in ((-1,0),(1,0),(0,-1),(0,1))
-            ni, nj = i+di, j+dj
-            1<=ni<=n && 1<=nj<=m && assign[ni,nj]==0 && push!(nb,(ni,nj))
+        # Find values used by already-assigned neighbours
+        blocked = Set{Int}()
+        for (di, dj) in [(-1,0),(1,0),(0,-1),(0,1)]
+            ni, nj = start[1]+di, start[2]+dj
+            if 1<=ni<=n && 1<=nj<=m && grid[ni,nj] > 0
+                push!(blocked, grid[ni,nj])
+            end
         end
-        return nb
-    end
 
-    for (i0, j0) in cells
-        assign[i0, j0] != 0 && continue   # déjà affecté
+        # Choose a target size that doesn't conflict with neighbours
+        max_possible = min(maxVal, length(remaining))
+        candidates   = [v for v in 1:max_possible if v ∉ blocked]
+        isempty(candidates) && (candidates = [1])
+        v_target = rand(candidates)
 
-        # Chercher les valeurs possibles (petites en priorité = plus facile à placer)
-        maxK_here = min(maxK, n*m)
-        ks = shuffle(rng, 1:min(maxK_here, 6))
+        # BFS growth: expand the region to v_target cells
+        region    = Tuple{Int,Int}[start]
+        in_region = Set{Tuple{Int,Int}}([start])
+        delete!(remaining, start)
 
-        placed = false
-        for k in ks
-            k == 1 && assign[i0,j0]==0 || true  # toujours essayable
-            # Vérifier qu'on peut former une zone de taille k depuis (i0,j0)
-            # via BFS glouton dans les cases libres
-            if k == 1
-                assign[i0, j0] = 1
-                placed = true
-                break
+        frontier = Tuple{Int,Int}[]
+        for (di, dj) in [(-1,0),(1,0),(0,-1),(0,1)]
+            ni, nj = start[1]+di, start[2]+dj
+            if 1<=ni<=n && 1<=nj<=m && (ni,nj) in remaining
+                push!(frontier, (ni, nj))
             end
+        end
 
-            # BFS pour trouver k-1 cases libres adjacentes
-            zone = [(i0, j0)]
-            frontier = freeNeighbors(i0, j0)
-            shuffle!(rng, frontier)
-            tmp_assign = copy(assign)
-            tmp_assign[i0, j0] = k
-
-            success = false
-            while length(zone) < k && !isempty(frontier)
-                ci, cj = popfirst!(frontier)
-                tmp_assign[ci,cj] != 0 && continue
-                push!(zone, (ci,cj))
-                tmp_assign[ci, cj] = k
-                new_nb = [(i+di, j+dj)
-                          for (i,j) in [(ci,cj)]
-                          for (di,dj) in ((-1,0),(1,0),(0,-1),(0,1))
-                          if 1<=i+di<=n && 1<=j+dj<=m && tmp_assign[i+di,j+dj]==0]
-                shuffle!(rng, new_nb)
-                append!(frontier, new_nb)
-            end
-
-            if length(zone) == k
-                # Appliquer la zone
-                for (zi,zj) in zone
-                    assign[zi,zj] = k
+        while length(region) < v_target && !isempty(frontier)
+            # Keep only frontier cells that won't merge with a same-value region
+            valid_next = filter(frontier) do cell
+                for (di, dj) in [(-1,0),(1,0),(0,-1),(0,1)]
+                    ni, nj = cell[1]+di, cell[2]+dj
+                    if 1<=ni<=n && 1<=nj<=m &&
+                       grid[ni,nj] == v_target && (ni,nj) ∉ in_region
+                        return false
+                    end
                 end
-                placed = true
-                break
+                return true
+            end
+
+            isempty(valid_next) && break
+
+            next = rand(valid_next)
+            push!(region, next)
+            push!(in_region, next)
+            delete!(remaining, next)
+            filter!(c -> c != next, frontier)
+
+            for (di, dj) in [(-1,0),(1,0),(0,-1),(0,1)]
+                ni, nj = next[1]+di, next[2]+dj
+                if 1<=ni<=n && 1<=nj<=m &&
+                   (ni,nj) in remaining && (ni,nj) ∉ in_region
+                    push!(frontier, (ni, nj))
+                end
             end
         end
 
-        # Si on n'a pas réussi, affecter 1 (cas de secours)
-        if !placed
-            assign[i0, j0] = 1
+        # Assign the actual region size as the value
+        actual_v = length(region)
+        for (ri, rj) in region
+            grid[ri, rj] = actual_v
         end
     end
 
-    # Corriger les erreurs résiduelles : zones de valeur k de taille ≠ k
-    # (peut arriver avec l'heuristique gloutonne) → on les met à 1
-    visited = falses(n, m)
+    return grid
+end
+
+# ---------------------------------------------------------------------------
+# Instance generator
+# ---------------------------------------------------------------------------
+
+"""
+Generate a random Filling instance of size n×m.
+
+Steps:
+  1. Generate a complete valid solution with generateSolution.
+  2. Reveal a random subset of cells (with probability `density`) as hints.
+
+Arguments:
+  - n, m    : grid dimensions
+  - density : fraction of cells revealed (default 0.35)
+  - maxVal  : maximum region size in the solution (default 6)
+
+Returns: n, m, grid (Array{Int,2})  — 0 = empty cell
+"""
+function generateInstance(n::Int, m::Int,
+                           density::Float64 = 0.35,
+                           maxVal::Int = 6)
+    sol  = generateSolution(n, m, maxVal)
+    grid = zeros(Int, n, m)
+
     for i in 1:n, j in 1:m
-        visited[i,j] && continue
-        comp = Tuple{Int,Int}[]
-        q = [(i,j)]; visited[i,j]=true
-        k = assign[i,j]
-        while !isempty(q)
-            ci,cj = popfirst!(q)
-            push!(comp,(ci,cj))
-            for (di,dj) in ((-1,0),(1,0),(0,-1),(0,1))
-                ni,nj=ci+di,cj+dj
-                1<=ni<=n && 1<=nj<=m && !visited[ni,nj] && assign[ni,nj]==k &&
-                    (visited[ni,nj]=true; push!(q,(ni,nj)))
+        if rand() < density
+            grid[i, j] = sol[i, j]
+        end
+    end
+
+    return n, m, grid
+end
+
+# ---------------------------------------------------------------------------
+# Write instance
+# ---------------------------------------------------------------------------
+
+"""
+Write a Filling grid to a text file (one row per line, cells separated by ", ").
+"""
+function writeInstance(fileName::String, n::Int, m::Int, grid::Array{Int,2})
+    fout = open(fileName, "w")
+    for i in 1:n
+        println(fout, join(grid[i, :], ", "))
+    end
+    close(fout)
+end
+
+# ---------------------------------------------------------------------------
+# Dataset generator
+# ---------------------------------------------------------------------------
+
+"""
+Generate a dataset of Filling instances and save them to ../data/.
+5 instances are generated for each grid size in {4, 5, 6, 7, 8, 10, 12, 15}.
+An instance is only generated if the corresponding file does not already exist.
+"""
+function generateDataSet()
+    dataFolder = "../data/"
+    isdir(dataFolder) || mkpath(dataFolder)
+
+    sizes       = [4, 5, 6, 7, 8, 10, 12, 15]
+    nbInstances = 5
+
+    for n in sizes
+        for k in 1:nbInstances
+            fileName = dataFolder * "instance_$(n)x$(n)_$(k).txt"
+            if !isfile(fileName)
+                _, _, grid = generateInstance(n, n)
+                writeInstance(fileName, n, n, grid)
+                println("Generated: ", fileName)
             end
         end
-        if length(comp) != k
-            for (ci,cj) in comp; assign[ci,cj]=1; end
-        end
     end
 
-    return assign
-end
-
-"""
-Génère une instance Filling aléatoire et la sauvegarde dans path.
-
-Paramètres :
-  - n, m          : taille de la grille
-  - revealRatio   : proportion de cases pré-remplies dans l'instance (défaut 0.3)
-  - maxK          : valeur maximale autorisée dans la grille (défaut 6)
-  - path          : chemin du fichier de sortie
-"""
-function generateInstance(n::Int            = 6,
-                          m::Int            = 6,
-                          revealRatio::Float64 = 0.30,
-                          maxK::Int         = 6,
-                          path::String      = "../data/instance_$(n)x$(m)_$(rand(1000:9999)).txt";
-                          seed::Int         = rand(1:100000))
-    rng = MersenneTwister(seed)
-
-    solution = generateValidGrid(n, m, maxK, rng)
-
-    # Masquer des cases (mettre à 0)
-    grid = copy(solution)
-    for i in 1:n, j in 1:m
-        rand(rng) > revealRatio && (grid[i,j] = 0)
-    end
-
-    mkpath(dirname(path) == "" ? "." : dirname(path))
-    open(path, "w") do f
-        for i in 1:n
-            println(f, join(grid[i,:], ", "))
-        end
-    end
-
-    println("Instance générée : $path  ($(n)×$(m), maxK=$maxK)")
-    return path
-end
-
-"""
-Génère un dataset d'instances de tailles variées.
-"""
-function generateDataSet(dataDir::String = "../data", seed::Int = 42)
-    Random.seed!(seed)
-    mkpath(dataDir)
-
-    # (n, m, revealRatio, maxK, nb_instances)
-    configs = [
-        (3, 3, 0.40, 3, 3),
-        (4, 4, 0.35, 4, 3),
-        (5, 5, 0.30, 5, 3),
-        (6, 6, 0.30, 6, 3),
-        (7, 7, 0.28, 7, 3),
-        (8, 8, 0.25, 8, 2),
-        (9, 9, 0.25, 9, 2),
-    ]
-
-    k = 1
-    for (n, m, rr, mk, count) in configs
-        for rep in 1:count
-            fname = "instance_$(lpad(k,3,'0'))_$(n)x$(m).txt"
-            generateInstance(n, m, rr, mk, joinpath(dataDir, fname); seed=seed+k)
-            k += 1
-        end
-    end
-    println("\n✅ $(k-1) instances générées dans $dataDir")
+    println("Dataset ready in ", dataFolder)
 end

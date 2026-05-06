@@ -1,62 +1,62 @@
-# ==============================================================================
-# Projet Filling - RO03
+# Filling – main entry point
 #
-# Structure du dossier (tout au même niveau) :
-#   io.jl, resolution.jl, generation.jl, main.jl
-#   data/instanceTest.txt
-#   res/cplex/
-#
-# Lancer depuis ce dossier :
-#   julia> include("main.jl")
-#   julia> testReadInstance()
-#   julia> testSolve()
-#   julia> generateAndSolve()
-# ==============================================================================
+# Usage (from the Filling/ directory in Julia REPL):
+#   include("main.jl")
+#   testReadInstance()
+#   testSolve()
+#   testHeuristic()
+#   generateAndSolve()
 
-include("generation.jl")   # → resolution.jl → io.jl
+include("src/resolution.jl")   # includes generation.jl → io.jl
 
-# ------------------------------------------------------------------
-# Test 1 : Lecture et affichage d'une instance
-# ------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Test 1 : read and display an instance
+# ---------------------------------------------------------------------------
 function testReadInstance(path::String = "data/instanceTest.txt")
-    println("\n=== readInputFile ===")
-    n, m, grid, maxVal = readInputFile(path)
-    println("Grille $(n)×$(m), maxVal=$maxVal")
+    println("\n=== Test readInputFile ===")
+    n, m, grid = readInputFile(path)
+    println("Grid $(n)×$(m) loaded successfully.")
+    println("\nInitial grid:")
     displayGrid(n, m, grid)
-    return n, m, grid, maxVal
+    return n, m, grid
 end
 
-# ------------------------------------------------------------------
-# Test 2 : Résolution exacte CPLEX + callback
-# ------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Test 2 : exact resolution with CPLEX
+# ---------------------------------------------------------------------------
 function testSolve(path::String = "data/instanceTest.txt")
-    println("\n=== cplexSolve (avec callback) ===")
-    n, m, grid, maxVal = readInputFile(path)
-
-    println("Grille initiale :")
-    displayGrid(n, m, grid)
-
-    isOptimal, solveTime, assign = cplexSolve(n, m, grid, maxVal)
-
+    println("\n=== Test cplexSolve ===")
+    n, m, grid = readInputFile(path)
+    isOptimal, solveTime, sol = cplexSolve(n, m, grid)
+    println("Optimal: ", isOptimal, "  |  Time: ", round(solveTime, digits=4), "s")
     if isOptimal
-        println("\n✅ Solution trouvée en $(round(solveTime, digits=4)) s")
-        displaySolution(n, m, assign)
+        println("\nSolution:")
+        displaySolution(n, m, sol)
+        println("Valid: ", checkSolution(n, m, sol))
     else
-        println("\n❌ Pas de solution ($(round(solveTime, digits=4)) s)")
+        println("No solution found.")
     end
-    return isOptimal, solveTime, assign
+    return isOptimal, solveTime, sol
 end
 
-# ------------------------------------------------------------------
-# Test 3 : Génération + résolution du dataset complet
-# ------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Test 3 : greedy heuristic
+# ---------------------------------------------------------------------------
+function testHeuristic(path::String = "data/instanceTest.txt")
+    println("\n=== Test heuristicSolve ===")
+    n, m, grid = readInputFile(path)
+    isValid, solveTime, sol = heuristicSolve(n, m, grid)
+    println("Valid: ", isValid, "  |  Time: ", round(solveTime, digits=4), "s")
+    println("\nHeuristic solution:")
+    displaySolution(n, m, sol)
+    return isValid, solveTime, sol
+end
+
+# ---------------------------------------------------------------------------
+# Test 4 : generate dataset and solve everything
+# ---------------------------------------------------------------------------
 function generateAndSolve()
-    println("\n=== Génération du dataset ===")
-    generateDataSet("data/")
-
-    println("\n=== Résolution du dataset ===")
-    solveDataSet("data/", "res/cplex")
-
-    println("\n=== Tableau des résultats ===")
-    resultsArray("data/", "res/cplex")
+    println("\n=== generateAndSolve ===")
+    generateDataSet()
+    solveDataSet()
 end
