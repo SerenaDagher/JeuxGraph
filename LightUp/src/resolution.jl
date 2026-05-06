@@ -91,45 +91,39 @@ function cplexSolve(n::Int, m::Int, grid::Array{String,2})
     # --- Objective (feasibility only) ---
     @objective(m_model, Min, 0)
 
-    # --- Constraints 1 & 2 (built together from L(c)) ---
-    # We use visibleFrom for both constraints:
-    #   C1: each white cell c must be illuminated  -> sum_{v in L(c)} x[v] >= 1
-    #   C2: no two lamps may see each other        -> x[u] + x[v] <= 1 for v in L(u), v != u
-    #
-    # (u,v) and (v,u) represent the same edge, so we track added pairs to avoid duplicates.
+    # --- Constraint 1 : each white cell must be illuminated ---
+    for i in 1:n, j in 1:m
+        if isWhite(grid, i, j)
+            L = visibleFrom(grid, n, m, i, j)
+            @constraint(m_model, sum(x[vi, vj] for (vi, vj) in L) >= 1)
+        end
+    end
 
+    # --- Constraint 2 : no two lamps may see each other ---
     added_pairs = Set{Tuple{Tuple{Int,Int}, Tuple{Int,Int}}}()
 
     for i in 1:n, j in 1:m
         if isWhite(grid, i, j)
             L = visibleFrom(grid, n, m, i, j)
-
-            # Constraint 1
-            @constraint(m_model, sum(x[vi, vj] for (vi, vj) in L) >= 1)
-
-            # Constraint 2  (reuse L — no separate function needed)
             for (vi, vj) in L
                 if (vi, vj) != (i, j)
-                    # Canonical form for the pair (smaller index first)
-                    pair = (i, j) <= (vi, vj) ? ((i, j), (vi, vj)) : ((vi, vj), (i, j))
+                    pair = (i,j) <= (vi,vj) ? ((i,j),(vi,vj)) : ((vi,vj),(i,j))
                     if !(pair in added_pairs)
                         push!(added_pairs, pair)
-                        @constraint(m_model, x[i, j] + x[vi, vj] <= 1)
+                        @constraint(m_model, x[i,j] + x[vi,vj] <= 1)
                     end
                 end
             end
         end
     end
 
-    # --- Constraint 3 (numbered black cells) ---
+    # --- Constraint 3 : numbered black cells ---
     for i in 1:n, j in 1:m
         c = grid[i, j]
         if length(c) == 1 && isdigit(c[1])
-            kb        = parse(Int, c)
+            kb = parse(Int, c)
             neighbors = whiteNeighbors(grid, n, m, i, j)
-            if isempty(neighbors) && kb > 0
-                @constraint(m_model, 0 >= 1)          # force infeasibility
-            elseif !isempty(neighbors)
+            if !isempty(neighbors)
                 @constraint(m_model, sum(x[ni, nj] for (ni, nj) in neighbors) == kb)
             end
         end

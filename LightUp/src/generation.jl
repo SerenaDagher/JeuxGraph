@@ -19,17 +19,17 @@ function generateInstance(n::Int, m::Int,
 
     grid = fill(".", n, m)
 
-    # Step 1 – randomly place black cells
+    # Step 1 – place ALL black cells first
     for i in 1:n, j in 1:m
         if rand() < blackRatio
             grid[i, j] = "N"
         end
     end
 
-    # Step 2 – number some black cells
+    # Step 2 – number some black cells AFTER all blacks are placed
+    # (so nb_white is exact and the number is always achievable)
     for i in 1:n, j in 1:m
         if grid[i, j] == "N" && rand() < numberedRatio
-            # Count orthogonal white neighbours
             nb_white = 0
             for (di, dj) in [(-1,0), (1,0), (0,-1), (0,1)]
                 ni, nj = i + di, j + dj
@@ -37,7 +37,6 @@ function generateInstance(n::Int, m::Int,
                     nb_white += 1
                 end
             end
-            # Assign a valid constraint value (0 to nb_white)
             grid[i, j] = string(rand(0:nb_white))
         end
     end
@@ -46,7 +45,7 @@ function generateInstance(n::Int, m::Int,
 end
 
 """
-Write a grid to a text file (CSV-like, one row per line, cells separated by ", ").
+Write a grid to a text file (one row per line, cells separated by ", ").
 """
 function writeInstance(fileName::String, n::Int, m::Int, grid::Array{String,2})
     fout = open(fileName, "w")
@@ -58,10 +57,6 @@ end
 
 """
 Generate a dataset of LightUp instances and save them to ../data/.
-
-Instances are generated for several sizes (4×4 up to 15×15),
-with nbInstances copies per size.
-An instance is only generated if the file does not already exist.
 """
 function generateDataSet()
 
@@ -72,7 +67,7 @@ function generateDataSet()
     end
 
     sizes       = [4, 5, 6, 7, 8, 10, 12, 15]
-    nbInstances = 5       # instances per size
+    nbInstances = 5
 
     for n in sizes
         for k in 1:nbInstances
