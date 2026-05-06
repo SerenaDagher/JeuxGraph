@@ -2,6 +2,7 @@
 
 using CPLEX
 using JuMP
+const MOI = JuMP.MOI
 
 include("generation.jl")
 
@@ -139,7 +140,7 @@ function cplexSolve(n::Int, m::Int, grid::Array{String,2})
     optimize!(m_model)
     solveTime = time() - start
 
-    isOptimal = JuMP.primal_status(m_model) == JuMP.MathOptInterface.FEASIBLE_POINT
+    isOptimal = primal_status(m_model) == MOI.FEASIBLE_POINT
 
     x_val = zeros(Float64, n, m)
     if isOptimal
