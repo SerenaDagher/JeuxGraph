@@ -1,4 +1,4 @@
-# This file contains methods to generate Filling instances
+# generation.jl for Filling — with wall support
 
 include("io.jl")
 
@@ -7,94 +7,83 @@ include("io.jl")
 # ---------------------------------------------------------------------------
 
 """
-Generate a valid complete Filling grid of size n×m.
-
-Strategy:
-  - Grow connected regions one by one using BFS from a random seed.
-  - Each region's value = its actual size.
-  - When choosing a value for a new region, avoid values already used by
-    adjacent assigned regions (to prevent two same-value regions touching).
-
-Arguments:
-  - n, m   : grid dimensions
-  - maxVal : maximum allowed value for a region (default 6)
-
-Returns: sol (n×m Array{Int,2})
+Generate a valid complete Filling grid (no walls considered here —
+walls are added separately in generateInstance).
 """
-function generateSolution(n::Int, m::Int, maxVal::Int = 6)
+function generateSolution(n::Int, m::Int, maxVal::Int = 6,
+                            walls::Set = Set())
     grid = zeros(Int, n, m)
-    remaining = Set{Tuple{Int,Int}}([(i, j) for i in 1:n for j in 1:m])
+    remaining = Set{Tuple{Int,Int}}([(i,j) for i in 1:n for j in 1:m])
 
     while !isempty(remaining)
-        # Pick a random unassigned starting cell
         start = rand(collect(remaining))
 
-        # Find values used by already-assigned neighbours
+        # Values already used by adjacent assigned regions
         blocked = Set{Int}()
-        for (di, dj) in [(-1,0),(1,0),(0,-1),(0,1)]
-            ni, nj = start[1]+di, start[2]+dj
-            if 1<=ni<=n && 1<=nj<=m && grid[ni,nj] > 0
-                push!(blocked, grid[ni,nj])
-            end
+        for (ni, nj) in getNeighbors(n, m, walls, start[1], start[2])
+            grid[ni,nj] > 0 && push!(blocked, grid[ni,nj])
         end
 
-        # Choose a target size that doesn't conflict with neighbours
         max_possible = min(maxVal, length(remaining))
-        candidates   = [v for v in 1:max_possible if v ∉ blocked]
+        candidates = [v for v in 1:max_possible if v ∉ blocked]
         isempty(candidates) && (candidates = [1])
         v_target = rand(candidates)
 
-        # BFS growth: expand the region to v_target cells
+        # BFS growth respecting walls
         region    = Tuple{Int,Int}[start]
         in_region = Set{Tuple{Int,Int}}([start])
         delete!(remaining, start)
 
         frontier = Tuple{Int,Int}[]
-        for (di, dj) in [(-1,0),(1,0),(0,-1),(0,1)]
-            ni, nj = start[1]+di, start[2]+dj
-            if 1<=ni<=n && 1<=nj<=m && (ni,nj) in remaining
-                push!(frontier, (ni, nj))
-            end
+        for (ni, nj) in getNeighbors(n, m, walls, start[1], start[2])
+            (ni,nj) in remaining && push!(frontier, (ni,nj))
         end
 
         while length(region) < v_target && !isempty(frontier)
-            # Keep only frontier cells that won't merge with a same-value region
             valid_next = filter(frontier) do cell
-                for (di, dj) in [(-1,0),(1,0),(0,-1),(0,1)]
-                    ni, nj = cell[1]+di, cell[2]+dj
-                    if 1<=ni<=n && 1<=nj<=m &&
-                       grid[ni,nj] == v_target && (ni,nj) ∉ in_region
-                        return false
-                    end
+                for (ni, nj) in getNeighbors(n, m, walls, cell[1], cell[2])
+                    grid[ni,nj] == v_target && (ni,nj) ∉ in_region && return false
                 end
                 return true
             end
-
             isempty(valid_next) && break
 
             next = rand(valid_next)
-            push!(region, next)
-            push!(in_region, next)
+            push!(region, next); push!(in_region, next)
             delete!(remaining, next)
             filter!(c -> c != next, frontier)
 
-            for (di, dj) in [(-1,0),(1,0),(0,-1),(0,1)]
-                ni, nj = next[1]+di, next[2]+dj
-                if 1<=ni<=n && 1<=nj<=m &&
-                   (ni,nj) in remaining && (ni,nj) ∉ in_region
-                    push!(frontier, (ni, nj))
-                end
+            for (ni, nj) in getNeighbors(n, m, walls, next[1], next[2])
+                (ni,nj) in remaining && (ni,nj) ∉ in_region && push!(frontier, (ni,nj))
             end
         end
 
-        # Assign the actual region size as the value
         actual_v = length(region)
-        for (ri, rj) in region
-            grid[ri, rj] = actual_v
-        end
+        for (ri,rj) in region; grid[ri,rj] = actual_v; end
     end
 
     return grid
+end
+
+# ---------------------------------------------------------------------------
+# Random wall generator
+# ---------------------------------------------------------------------------
+
+"""
+Generate a random set of walls for an n×m grid.
+wallDensity = probability that each internal edge is a wall.
+"""
+function generateWalls(n::Int, m::Int, wallDensity::Float64 = 0.10)
+    walls = Set{Tuple{Tuple{Int,Int},Tuple{Int,Int}}}()
+    # Horizontal walls: between (i,j) and (i+1,j)
+    for i in 1:n-1, j in 1:m
+        rand() < wallDensity && push!(walls, ((i,j),(i+1,j)))
+    end
+    # Vertical walls: between (i,j) and (i,j+1)
+    for i in 1:n, j in 1:m-1
+        rand() < wallDensity && push!(walls, ((i,j),(i,j+1)))
+    end
+    return walls
 end
 
 # ---------------------------------------------------------------------------
@@ -102,32 +91,24 @@ end
 # ---------------------------------------------------------------------------
 
 """
-Generate a random Filling instance of size n×m.
+Generate a random Filling instance with walls.
+  1. Generate random walls.
+  2. Generate a valid complete solution (respecting walls).
+  3. Reveal a subset of cells as hints.
 
-Steps:
-  1. Generate a complete valid solution with generateSolution.
-  2. Reveal a random subset of cells (with probability `density`) as hints.
-
-Arguments:
-  - n, m    : grid dimensions
-  - density : fraction of cells revealed (default 0.35)
-  - maxVal  : maximum region size in the solution (default 6)
-
-Returns: n, m, grid (Array{Int,2})  — 0 = empty cell
+Returns: n, m, grid, walls
 """
 function generateInstance(n::Int, m::Int,
-                           density::Float64 = 0.35,
-                           maxVal::Int = 6)
-    sol  = generateSolution(n, m, maxVal)
-    grid = zeros(Int, n, m)
-
+                           density::Float64    = 0.35,
+                           maxVal::Int         = 6,
+                           wallDensity::Float64 = 0.08)
+    walls = generateWalls(n, m, wallDensity)
+    sol   = generateSolution(n, m, maxVal, walls)
+    grid  = zeros(Int, n, m)
     for i in 1:n, j in 1:m
-        if rand() < density
-            grid[i, j] = sol[i, j]
-        end
+        rand() < density && (grid[i,j] = sol[i,j])
     end
-
-    return n, m, grid
+    return n, m, grid, walls
 end
 
 # ---------------------------------------------------------------------------
@@ -135,12 +116,24 @@ end
 # ---------------------------------------------------------------------------
 
 """
-Write a Filling grid to a text file (one row per line, cells separated by ", ").
+Write a Filling instance to a text file including the wall list.
 """
-function writeInstance(fileName::String, n::Int, m::Int, grid::Array{Int,2})
+function writeInstance(fileName::String, n::Int, m::Int,
+                        grid::Array{Int,2},
+                        walls::Set = Set())
     fout = open(fileName, "w")
     for i in 1:n
-        println(fout, join(grid[i, :], ", "))
+        println(fout, join(grid[i,:], ", "))
+    end
+    if !isempty(walls)
+        println(fout, "WALLS")
+        for ((i1,j1),(i2,j2)) in walls
+            if i1 == i2          # same row → vertical wall
+                println(fout, "V ", i1, " ", min(j1,j2))
+            else                 # same column → horizontal wall
+                println(fout, "H ", min(i1,i2), " ", j1)
+            end
+        end
     end
     close(fout)
 end
@@ -150,27 +143,24 @@ end
 # ---------------------------------------------------------------------------
 
 """
-Generate a dataset of Filling instances and save them to ../data/.
-5 instances are generated for each grid size in {4, 5, 6, 7, 8, 10, 12, 15}.
-An instance is only generated if the corresponding file does not already exist.
+Generate a dataset of Filling instances with walls and save to ../data/.
 """
 function generateDataSet()
     dataFolder = "../data/"
     isdir(dataFolder) || mkpath(dataFolder)
 
-    sizes       = [4, 5, 6, 7, 8, 10, 12, 15]
+    sizes = [4, 5, 6, 7, 8, 10, 12, 15]
     nbInstances = 5
 
     for n in sizes
         for k in 1:nbInstances
             fileName = dataFolder * "instance_$(n)x$(n)_$(k).txt"
             if !isfile(fileName)
-                _, _, grid = generateInstance(n, n)
-                writeInstance(fileName, n, n, grid)
+                _, _, grid, walls = generateInstance(n, n)
+                writeInstance(fileName, n, n, grid, walls)
                 println("Generated: ", fileName)
             end
         end
     end
-
     println("Dataset ready in ", dataFolder)
 end
