@@ -26,15 +26,15 @@ end
 function testSolve(path::String = "data/instanceTest.txt")
     println("\n=== Test cplexSolve ===")
     n, m, grid = readInputFile(path)
-    isOptimal, solveTime, x_val = cplexSolve(n, m, grid)
-    println("Optimal: ", isOptimal, "  |  Time: ", round(solveTime, digits=4), "s")
-    if isOptimal
+    SolutionFound, solveTime, x_val = cplexSolve(n, m, grid)
+    println("SolutionFound: ", SolutionFound, "  |  Time: ", round(solveTime, digits=4), "s")
+    if SolutionFound
         println("\nSolution:")
         displaySolution(n, m, grid, x_val)
     else
         println("No solution found.")
     end
-    return isOptimal, solveTime, x_val
+    return SolutionFound, solveTime, x_val
 end
 
 # ---------------------------------------------------------------------------

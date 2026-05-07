@@ -127,7 +127,7 @@ Arguments
 Prerequisites:
 - Each subfolder must contain text files
 - Each text file correspond to the resolution of one instance
-- Each text file contains a variable "solveTime" and a variable "isOptimal"
+- Each text file contains a variable "solveTime" and a variable "SolutionFound"
 """
 function performanceDiagram(outputFile::String)
 
@@ -167,7 +167,7 @@ function performanceDiagram(outputFile::String)
             for resultFile in filter(x->occursin(".txt", x), readdir(path))
                 fileCount += 1
                 include(path * "/" * resultFile)
-                if isOptimal
+                if SolutionFound
                     results[folderCount, fileCount] = solveTime
                     if solveTime > maxSolveTime
                         maxSolveTime = solveTime
@@ -224,7 +224,7 @@ Arguments
 Prerequisites:
 - Each subfolder must contain text files
 - Each text file correspond to the resolution of one instance
-- Each text file contains a variable "solveTime" and a variable "isOptimal"
+- Each text file contains a variable "solveTime" and a variable "SolutionFound"
 """
 function resultsArray(outputFile::String)
     
@@ -290,7 +290,7 @@ function resultsArray(outputFile::String)
     end
     header *= "\\\\\n\\textbf{Instance} "
     for folder in folderName
-        header *= " & \\textbf{Temps (s)} & \\textbf{Optimal ?} "
+        header *= " & \\textbf{Temps (s)} & \\textbf{SolutionFound ?} "
     end
     header *= "\\\\\\hline\n"
 
@@ -314,7 +314,7 @@ function resultsArray(outputFile::String)
             if isfile(path)
                 include(path)
                 println(fout, " & ", round(solveTime, digits=2), " & ")
-                if isOptimal
+                if SolutionFound
                     println(fout, "\$\\times\$")
                 end
             else

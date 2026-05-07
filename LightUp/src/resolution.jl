@@ -68,7 +68,7 @@ Arguments:
   - grid  : n×m Array{String,2}
 
 Returns:
-  - isOptimal   : Bool  — true if a feasible solution was found
+  - SolutionFound   : Bool  — true if a feasible solution was found
   - solveTime   : Float64 — resolution time in seconds
   - x_val       : Array{Float64,2} — solution matrix (1.0 = lamp, 0.0 = no lamp)
 """
@@ -134,14 +134,14 @@ function cplexSolve(n::Int, m::Int, grid::Array{String,2})
     optimize!(m_model)
     solveTime = time() - start
 
-    isOptimal = primal_status(m_model) == MOI.FEASIBLE_POINT
+    SolutionFound = primal_status(m_model) == MOI.FEASIBLE_POINT
 
     x_val = zeros(Float64, n, m)
-    if isOptimal
+    if SolutionFound
         x_val = value.(x)
     end
 
-    return isOptimal, solveTime, x_val
+    return SolutionFound, solveTime, x_val
 end
 
 # ---------------------------------------------------------------------------
@@ -151,7 +151,7 @@ end
 """
 Solve all instances in ../data/ with CPLEX.
 Results are written to ../res/cplex/<instance>.txt
-Each result file contains: solveTime and isOptimal
+Each result file contains: solveTime and SolutionFound
 """
 function solveDataSet()
 
@@ -168,7 +168,7 @@ function solveDataSet()
         end
     end
 
-    global isOptimal = false
+    global SolutionFound = false
     global solveTime = -1
 
     for file in filter(x -> occursin(".txt", x), readdir(dataFolder))
@@ -184,24 +184,24 @@ function solveDataSet()
 
                 fout = open(outputFile, "w")
                 resolutionTime = -1
-                isOptimal      = false
+                SolutionFound      = false
 
                 if resolutionMethod[methodId] == "cplex"
 
-                    isOptimal, resolutionTime, x_val = cplexSolve(n, m, grid)
+                    SolutionFound, resolutionTime, x_val = cplexSolve(n, m, grid)
 
-                    if isOptimal
+                    if SolutionFound
                         displaySolution(n, m, grid, x_val)
                     end
                 end
 
                 println(fout, "solveTime = ", resolutionTime)
-                println(fout, "isOptimal = ", isOptimal)
+                println(fout, "SolutionFound = ", SolutionFound)
                 close(fout)
             end
 
             include(outputFile)
-            println(resolutionMethod[methodId], " optimal: ", isOptimal)
+            println(resolutionMethod[methodId], " SolutionFound: ", SolutionFound)
             println(resolutionMethod[methodId], " time: " * string(round(solveTime, sigdigits=2)) * "s\n")
         end
     end
