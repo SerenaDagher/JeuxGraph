@@ -143,10 +143,10 @@ end
 # ---------------------------------------------------------------------------
 
 """
-Generate a dataset of Filling instances with walls and save to ../data/.
+Generate a dataset of Filling instances with walls and save to data/.
 """
 function generateDataSet()
-    dataFolder = "../data/"
+    dataFolder = "data/"
     isdir(dataFolder) || mkpath(dataFolder)
 
     sizes = [4, 5, 6, 7, 8, 10, 12, 15]

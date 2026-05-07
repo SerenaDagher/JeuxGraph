@@ -43,8 +43,9 @@ function testHeuristic(path::String = "data/instanceTest.txt")
     return isValid, solveTime, sol
 end
 
-function generateAndSolve()
+function generateAndSolve(; methods::Vector{String}=["cplex", "heuristic"],
+                            force::Bool=false)
     println("\n=== generateAndSolve ===")
     generateDataSet()
-    solveDataSet()
+    solveDataSet(methods=methods, force=force)
 end

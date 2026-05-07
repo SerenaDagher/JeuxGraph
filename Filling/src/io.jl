@@ -192,7 +192,7 @@ end
 # ---------------------------------------------------------------------------
 
 function performanceDiagram(outputFile::String)
-    resultFolder = "../res/"
+    resultFolder = "res/"
     maxSize = 0; subfolderCount = 0
     folderName = String[]
     for file in readdir(resultFolder)
@@ -237,7 +237,7 @@ function performanceDiagram(outputFile::String)
 end
 
 function resultsArray(outputFile::String)
-    resultFolder = "../res/"; dataFolder = "../data/"
+    resultFolder = "res/"; dataFolder = "data/"
     maxSize = 0; subfolderCount = 0
     fout = open(outputFile, "w")
     println(fout, "\\documentclass{article}\n\\usepackage[utf8]{inputenc}\n\\begin{document}")
