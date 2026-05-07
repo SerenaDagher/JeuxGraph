@@ -22,7 +22,7 @@ function testSolve(path::String = "data/instanceTest.txt")
     println("\n=== Test cplexSolve ===")
     n, m, grid, walls = readInputFile(path)
     isOptimal, solveTime, sol = cplexSolve(n, m, grid, walls)
-    println("Optimal: ", isOptimal, "  |  Time: ", round(solveTime, digits=4), "s")
+    println("Solution found: ", isOptimal, "  |  Time: ", round(solveTime, digits=4), "s")
     if isOptimal
         println("\nSolution:")
         displaySolution(n, m, sol, walls)
@@ -38,14 +38,19 @@ function testHeuristic(path::String = "data/instanceTest.txt")
     n, m, grid, walls = readInputFile(path)
     isValid, solveTime, sol = heuristicSolve(n, m, grid, walls)
     println("Valid: ", isValid, "  |  Time: ", round(solveTime, digits=4), "s")
-    println("\nHeuristic solution:")
+    if isValid
+        println("\nHeuristic solution:")
+    else
+        println("\nLast heuristic try (filled grid, invalid):")
+    end
     displaySolution(n, m, sol, walls)
     return isValid, solveTime, sol
 end
 
 function generateAndSolve(; methods::Vector{String}=["cplex", "heuristic"],
-                            force::Bool=false)
+                            force::Bool=true,
+                            csvFile::String="res/results.csv")
     println("\n=== generateAndSolve ===")
-    generateDataSet()
-    solveDataSet(methods=methods, force=force)
+    generateDataSet(clean=true)
+    solveDataSet(methods=methods, force=force, csvFile=csvFile)
 end

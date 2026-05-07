@@ -87,8 +87,12 @@ function cplexSolve(n::Int, m::Int, grid::Array{Int,2},
                     sz == k && continue  # composante correcte
 
                     if sz > k
-                        # trop grande : au plus k cases
-                        cstr = @build_constraint(sum(x[ci,cj,k] for (ci,cj) in component) <= k)
+                        # Composante trop grande :
+                        # on interdit seulement cette composante exacte,
+                        # pas toutes les façons de garder k cases dedans.
+                        cstr = @build_constraint(
+                            sum(x[ci, cj, k] for (ci, cj) in component) <= sz - 1
+                        )
                         MOI.submit(m_model, MOI.LazyConstraint(cb_data), cstr)
                     else
                         # trop petite : au moins une case doit s'étendre
@@ -203,13 +207,15 @@ end
 function solveDataSet(dataFolder::String="data/",
                       resFolder::String="res/";
                       methods::Vector{String}=["cplex","heuristic"],
-                      force::Bool=false)
+                      force::Bool=false,
+                      csvFile::String=joinpath(resFolder, "results.csv"))
 
     for method in methods
         method in ["cplex", "heuristic"] || error("Unknown method: $method")
     end
 
     isdir(dataFolder) || error("Data folder not found: $dataFolder")
+    isdir(resFolder) || mkpath(resFolder)
 
     for method in methods
         folder = joinpath(resFolder, method)
@@ -220,42 +226,61 @@ function solveDataSet(dataFolder::String="data/",
     global solveTime = -1.0
     global isValid = false
 
-    for file in sort(filter(x -> endswith(x, ".txt"), readdir(dataFolder)))
-        inputFile = joinpath(dataFolder, file)
-        println("-- Resolution of ", file)
-        n, m, grid, walls = readInputFile(inputFile)
+    csvEscape(value) = "\"" * replace(string(value), "\"" => "\"\"") * "\""
 
-        for method in methods
-            outputFile = joinpath(resFolder, method, file)
+    open(csvFile, "w") do csv
+        println(csv, "instance,n,m,method,solved,valid,solve_time,walls")
 
-            if force || !isfile(outputFile)
-                local resolutionTime = -1.0
-                local solved = false
+        for file in sort(filter(x -> endswith(x, ".txt"), readdir(dataFolder)))
+            inputFile = joinpath(dataFolder, file)
+            println("-- Resolution of ", file)
+            n, m, grid, walls = readInputFile(inputFile)
 
-                if method == "cplex"
-                    solved, resolutionTime, _ = cplexSolve(n, m, grid, walls)
-                elseif method == "heuristic"
-                    solved, resolutionTime, _ = heuristicSolve(n, m, grid, walls)
-                end
+            for method in methods
+                outputFile = joinpath(resFolder, method, file)
 
-                open(outputFile, "w") do fout
-                    println(fout, "solveTime = ", resolutionTime)
-                    println(fout, "isOptimal = ", solved)
-                    if method == "heuristic"
-                        println(fout, "isValid = ", solved)
+                if force || !isfile(outputFile)
+                    local resolutionTime = -1.0
+                    local solved = false
+
+                    if method == "cplex"
+                        solved, resolutionTime, _ = cplexSolve(n, m, grid, walls)
+                    elseif method == "heuristic"
+                        solved, resolutionTime, _ = heuristicSolve(n, m, grid, walls)
+                    end
+
+                    open(outputFile, "w") do fout
+                        println(fout, "solveTime = ", resolutionTime)
+                        println(fout, "isOptimal = ", solved)
+                        if method == "heuristic"
+                            println(fout, "isValid = ", solved)
+                        end
                     end
                 end
-            end
 
-            global isValid = false
-            include(outputFile)
-            if method == "heuristic"
-                isValid = isdefined(Main, :isValid) ? Main.isValid : solved
-                println(method, " valid: ", isValid)
-            else
-                println(method, " optimal: ", isOptimal)
+                global isValid = false
+                include(outputFile)
+                local rowValid = method == "heuristic" ? isValid : isOptimal
+                if method == "heuristic"
+                    println(method, " valid: ", isValid)
+                else
+                    println(method, " solution found: ", isOptimal)
+                end
+                println(method, " time: ", round(solveTime, sigdigits=2), "s\n")
+
+                println(csv, join([
+                    csvEscape(file),
+                    string(n),
+                    string(m),
+                    csvEscape(method),
+                    string(isOptimal),
+                    string(rowValid),
+                    string(solveTime),
+                    string(length(walls))
+                ], ","))
             end
-            println(method, " time: ", round(solveTime, sigdigits=2), "s\n")
         end
     end
+
+    println("CSV results written to ", csvFile)
 end

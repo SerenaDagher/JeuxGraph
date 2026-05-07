@@ -145,12 +145,19 @@ end
 """
 Generate a dataset of Filling instances with walls and save to data/.
 """
-function generateDataSet()
+function generateDataSet(; clean::Bool = true)
     dataFolder = "data/"
     isdir(dataFolder) || mkpath(dataFolder)
 
-    sizes = [4, 5, 6, 7, 8, 10, 12, 15]
-    nbInstances = 5
+    if clean
+        for file in filter(x -> startswith(x, "instance_") && endswith(x, ".txt"), readdir(dataFolder))
+            rm(joinpath(dataFolder, file); force=true)
+        end
+        println("Deleted previous generated instances in ", dataFolder)
+    end
+
+    sizes = [15]
+    nbInstances = 80
 
     for n in sizes
         for k in 1:nbInstances
