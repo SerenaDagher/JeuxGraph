@@ -1,18 +1,8 @@
-# generation.jl for Filling
 
 include("io.jl")
 include("solutions.jl")
 
-# ---------------------------------------------------------------------------
-# Instance generator
-# ---------------------------------------------------------------------------
 
-"""
-Generate a random Filling instance from a known solution.
-  - Exactly one clue per region is revealed.
-
-Returns: n, m, grid
-"""
 function generateInstance(n::Int, m::Int)
     haskey(KNOWN_SOLUTIONS, (n, m)) ||
         error("No known solution for $(n)×$(m). Add one to src/solutions.jl.")
@@ -26,7 +16,6 @@ function generateInstance(n::Int, m::Int)
         visited[i, j] && continue
         v = sol[i, j]
 
-        # BFS to collect the full region
         comp  = Tuple{Int,Int}[]
         queue = [(i, j)]
         visited[i, j] = true
@@ -41,7 +30,6 @@ function generateInstance(n::Int, m::Int)
             end
         end
 
-        # Always reveal one clue per region
         clue = rand(comp)
         grid[clue[1], clue[2]] = v
     end
@@ -49,13 +37,7 @@ function generateInstance(n::Int, m::Int)
     return n, m, grid
 end
 
-# ---------------------------------------------------------------------------
-# Write instance
-# ---------------------------------------------------------------------------
 
-"""
-Write a Filling instance to a text file.
-"""
 function writeInstance(fileName::String, n::Int, m::Int, grid::Array{Int,2})
     fout = open(fileName, "w")
     for i in 1:n
@@ -64,13 +46,7 @@ function writeInstance(fileName::String, n::Int, m::Int, grid::Array{Int,2})
     close(fout)
 end
 
-# ---------------------------------------------------------------------------
-# Dataset generator
-# ---------------------------------------------------------------------------
 
-"""
-Generate a dataset of Filling instances from known solutions and save to data/.
-"""
 function generateDataSet(; clean::Bool = true)
     dataFolder = "data/"
     isdir(dataFolder) || mkpath(dataFolder)
@@ -82,7 +58,7 @@ function generateDataSet(; clean::Bool = true)
         println("Deleted previous generated instances in ", dataFolder)
     end
 
-    sizes      = [3, 4, 5, 6,7, 8, 9, 10, 11, 12, 13, 14, 15]
+    sizes = sort([3, 4, 5, 6, 7, 8, 9,10,11,12])
     nbInstances = 50
 
     for n in sizes

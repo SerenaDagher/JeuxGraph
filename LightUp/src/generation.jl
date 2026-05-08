@@ -1,33 +1,18 @@
-# This file contains methods to generate LightUp instances
 
 include("io.jl")
 
-"""
-Generate a random LightUp instance of size n×m.
-
-Arguments:
-  - n            : number of rows
-  - m            : number of columns
-  - blackRatio   : probability for a cell to be black  (default 0.30)
-  - numberedRatio: probability for a black cell to carry a number (default 0.50)
-
-Returns: n, m, grid (Array{String,2})
-"""
 function generateInstance(n::Int, m::Int,
                            blackRatio::Float64    = 0.30,
                            numberedRatio::Float64 = 0.50)
 
     grid = fill(".", n, m)
 
-    # Step 1 – place ALL black cells first
     for i in 1:n, j in 1:m
         if rand() < blackRatio
             grid[i, j] = "N"
         end
     end
 
-    # Step 2 – number some black cells AFTER all blacks are placed
-    # (so nb_white is exact and the number is always achievable)
     for i in 1:n, j in 1:m
         if grid[i, j] == "N" && rand() < numberedRatio
             nb_white = 0
@@ -44,9 +29,6 @@ function generateInstance(n::Int, m::Int,
     return n, m, grid
 end
 
-"""
-Write a grid to a text file (one row per line, cells separated by ", ").
-"""
 function writeInstance(fileName::String, n::Int, m::Int, grid::Array{String,2})
     fout = open(fileName, "w")
     for i in 1:n
@@ -55,9 +37,6 @@ function writeInstance(fileName::String, n::Int, m::Int, grid::Array{String,2})
     close(fout)
 end
 
-"""
-Generate a dataset of LightUp instances and save them to ../data/.
-"""
 function generateDataSet()
 
     dataFolder = "data/"

@@ -1,16 +1,6 @@
-# LightUp – main entry point
-#
-# Usage (from the LightUp/ directory in Julia REPL):
-#   include("main.jl")
-#   testReadInstance()
-#   testSolve()
-#   generateAndSolve()
 
-include("src/resolution.jl")   # includes generation.jl → io.jl
+include("src/resolution.jl")
 
-# ---------------------------------------------------------------------------
-# Test 1 : read and display an instance
-# ---------------------------------------------------------------------------
 function testReadInstance(path::String = "data/instanceTest.txt")
     println("\n=== Test readInputFile ===")
     n, m, grid = readInputFile(path)
@@ -20,9 +10,6 @@ function testReadInstance(path::String = "data/instanceTest.txt")
     return n, m, grid
 end
 
-# ---------------------------------------------------------------------------
-# Test 2 : solve with CPLEX
-# ---------------------------------------------------------------------------
 function testSolve(path::String = "data/instanceTest.txt")
     println("\n=== Test cplexSolve ===")
     n, m, grid = readInputFile(path)
@@ -37,9 +24,6 @@ function testSolve(path::String = "data/instanceTest.txt")
     return SolutionFound, solveTime, x_val
 end
 
-# ---------------------------------------------------------------------------
-# Test 3 : generate dataset and solve all instances
-# ---------------------------------------------------------------------------
 function generateAndSolve()
     println("\n=== generateAndSolve ===")
     generateDataSet()

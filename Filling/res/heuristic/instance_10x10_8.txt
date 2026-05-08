@@ -1,3 +1,3 @@
-solveTime = 0.0
+solveTime = 10.004999876022339
 SolutionFound = false
 isValid = false

@@ -1,0 +1,3 @@
+solveTime = 0.09299993515014648
+SolutionFound = true
+isValid = true

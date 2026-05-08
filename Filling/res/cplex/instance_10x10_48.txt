@@ -1,2 +1,2 @@
-solveTime = 0.010999917984008789
-SolutionFound = false
+solveTime = 25.56499981880188
+SolutionFound = true

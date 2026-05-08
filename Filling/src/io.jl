@@ -1,16 +1,9 @@
-# io.jl for Filling
 
 using JuMP
 using Plots
 import GR
 
-# ---------------------------------------------------------------------------
-# Neighbor helper
-# ---------------------------------------------------------------------------
 
-"""
-Return all orthogonal neighbours of (i,j) within the grid.
-"""
 function getNeighbors(n::Int, m::Int, i::Int, j::Int)
     nbrs = Tuple{Int,Int}[]
     for (di, dj) in [(-1,0),(1,0),(0,-1),(0,1)]
@@ -21,24 +14,12 @@ function getNeighbors(n::Int, m::Int, i::Int, j::Int)
     return nbrs
 end
 
-# ---------------------------------------------------------------------------
-# Read
-# ---------------------------------------------------------------------------
 
-"""
-Read a Filling instance from a text file.
-
-Format:
-  - One CSV row per grid line (0 = empty, k = pre-filled value k)
-
-Returns: n, m, grid
-"""
 function readInputFile(inputFile::String)
     datafile = open(inputFile)
     data = readlines(datafile)
     close(datafile)
 
-    # Ignore any WALLS section if present in old files
     sep = findfirst(l -> strip(l) == "WALLS", data)
     grid_lines = sep === nothing ? data : data[1:sep-1]
 
@@ -56,15 +37,7 @@ function readInputFile(inputFile::String)
     return n, m, grid
 end
 
-# ---------------------------------------------------------------------------
-# Display
-# ---------------------------------------------------------------------------
 
-"""
-Display the initial Filling grid.
-  _  = empty cell
-  k  = pre-filled cell
-"""
 function displayGrid(n::Int, m::Int, grid::Array{Int,2})
     println("+" * repeat("---+", m))
     for i in 1:n
@@ -86,9 +59,6 @@ function displayGrid(n::Int, m::Int, grid::Array{Int,2})
     println("+" * repeat("---+", m))
 end
 
-"""
-Display the solved Filling grid.
-"""
 function displaySolution(n::Int, m::Int, sol::Array{Int,2})
     println("+" * repeat("---+", m))
     for i in 1:n
@@ -110,14 +80,7 @@ function displaySolution(n::Int, m::Int, sol::Array{Int,2})
     println("+" * repeat("---+", m))
 end
 
-# ---------------------------------------------------------------------------
-# Validation
-# ---------------------------------------------------------------------------
 
-"""
-Check that a complete Filling solution is valid:
-every connected component of value v has exactly v cells.
-"""
 function checkSolution(n::Int, m::Int, sol::Array{Int,2})
     visited = falses(n, m)
     for i in 1:n, j in 1:m
@@ -144,9 +107,6 @@ function checkSolution(n::Int, m::Int, sol::Array{Int,2})
     return true
 end
 
-# ---------------------------------------------------------------------------
-# Results (template — do not modify)
-# ---------------------------------------------------------------------------
 
 function performanceDiagram(outputFile::String)
     resultFolder = "res/"

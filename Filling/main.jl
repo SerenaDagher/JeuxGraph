@@ -1,15 +1,5 @@
-# Filling — main entry point
-#
-# Usage (from the Filling/ directory in Julia REPL):
-#   include("main.jl")
-#   testReadInstance()          — affiche la grille du fichier test
-#   testSolve()                 — résout le fichier test avec CPLEX
-#   testHeuristic()             — résout le fichier test avec l'heuristique
-#   generateAndSolve()          — génère + résout avec CPLEX et heuristique
-#   generateAndSolve(methods=["cplex"])      — CPLEX uniquement
-#   generateAndSolve(methods=["heuristic"]) — heuristique uniquement
 
-include("src/resolution.jl")   # includes generation.jl → io.jl
+include("src/resolution.jl")
 
 function testReadInstance(path::String = "data/instanceTest.txt")
     println("\n=== Test readInputFile ===")
@@ -49,7 +39,7 @@ function testHeuristic(path::String = "data/instanceTest.txt")
     return isValid, solveTime, sol
 end
 
-function generateAndSolve(; methods::Vector{String}=["cplex"],
+function generateAndSolve(; methods::Vector{String}=["heuristic"],
                             force::Bool=true,
                             csvFile::String="res/results.csv")
     println("\n=== generateAndSolve ===")

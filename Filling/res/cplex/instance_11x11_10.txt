@@ -1,0 +1,2 @@
+solveTime = 49.3289999961853
+SolutionFound = true

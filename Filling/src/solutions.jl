@@ -1,15 +1,12 @@
-# solutions.jl — Known valid Filling solutions
 
 const KNOWN_SOLUTIONS = Dict{Tuple{Int,Int}, Matrix{Int}}(
 
-    # 3x3
     (3, 3) => [
         1 2 2;
         3 3 3;
         1 2 2
     ],
 
-    # 4x4
     (4, 4) => [
         4 4 4 4;
         2 3 3 1;
@@ -17,7 +14,6 @@ const KNOWN_SOLUTIONS = Dict{Tuple{Int,Int}, Matrix{Int}}(
         1 4 4 4
     ],
 
-    # 5x5
     (5, 5) => [
         4 4 4 4 1;
         5 5 5 3 3;
@@ -26,7 +22,6 @@ const KNOWN_SOLUTIONS = Dict{Tuple{Int,Int}, Matrix{Int}}(
         3 2 4 4 4
     ],
 
-    # 6x6
     (6, 6) => [
         2 2 6 6 5 5;
         5 5 6 6 5 5;
@@ -36,7 +31,6 @@ const KNOWN_SOLUTIONS = Dict{Tuple{Int,Int}, Matrix{Int}}(
         3 4 4 6 6 6
     ],
 
-    # 7x7
     (7, 7) => [
         5 6 6 6 3 6 6;
         5 6 6 6 3 6 6;
@@ -47,7 +41,6 @@ const KNOWN_SOLUTIONS = Dict{Tuple{Int,Int}, Matrix{Int}}(
         4 1 2 3 3 3 5
     ],
 
-    # 8x8
     (8, 8) => [
         2 6 4 4 4 4 2 2;
         2 6 3 3 3 5 5 5;
@@ -59,7 +52,6 @@ const KNOWN_SOLUTIONS = Dict{Tuple{Int,Int}, Matrix{Int}}(
         3 3 6 6 6 4 4 6
     ],
 
-    # 9x9
     (9, 9) => [
         9 2 2 3 4 3 3 4 4;
         9 9 3 3 4 4 3 4 4;
@@ -72,7 +64,6 @@ const KNOWN_SOLUTIONS = Dict{Tuple{Int,Int}, Matrix{Int}}(
         4 4 9 3 3 6 6 5 5
     ],
 
-    # 10x10
     (10, 10) => [
         9 9 9 2 2 5 5 7 7 7;
         2 2 9 6 6 5 5 7 7 7;
@@ -86,7 +77,6 @@ const KNOWN_SOLUTIONS = Dict{Tuple{Int,Int}, Matrix{Int}}(
         4 4 4 4 8 8 8 4 4 4
     ],
 
-    # 11x11
     (11, 11) => [
         4 4 5 5 5 3 6 4 4 4 4;
         6 4 4 3 5 3 6 6 6 6 6;
@@ -101,7 +91,6 @@ const KNOWN_SOLUTIONS = Dict{Tuple{Int,Int}, Matrix{Int}}(
         7 7 7 7 7 7 8 8 8 8 8
     ],
 
-    # 12x12
     (12, 12) => [
         4 4 4 4 5 5 5 5 5 4 2 1;
         7 7 7 6 3 3 3 4 4 4 2 3;
@@ -117,7 +106,6 @@ const KNOWN_SOLUTIONS = Dict{Tuple{Int,Int}, Matrix{Int}}(
         4 4 9 9 9 9 6 4 4 2 5 5
     ],
 
-    # 13x13
     (13, 13) => [
         5 5 5 5 5 7 7 2 4 2 5 2 8;
         8 8 8 3 3 7 7 2 4 2 5 2 8;
@@ -134,7 +122,6 @@ const KNOWN_SOLUTIONS = Dict{Tuple{Int,Int}, Matrix{Int}}(
         2 2 5 5 5 2 4 4 9 9 9 9 1
     ],
 
-    # 14x14
     (14, 14) => [
         3 3 5 5 4 4 2 2 3 3 2 7 7 5;
         3 5 5 5 1 4 7 7 4 3 2 7 7 5;
@@ -152,7 +139,6 @@ const KNOWN_SOLUTIONS = Dict{Tuple{Int,Int}, Matrix{Int}}(
         4 4 4 9 9 7 7 5 5 3 3 3 8 8
     ],
 
-    # 15x15
     (15, 15) => [
         6 6 3 3 5 5 5 4 3 3 8 8 8 4 4;
         6 4 3 5 5 9 9 4 3 5 5 8 8 4 4;
