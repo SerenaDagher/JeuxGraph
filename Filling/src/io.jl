@@ -130,7 +130,7 @@ function performanceDiagram(outputFile::String)
                 fileCount += 1
                 include(path * "/" * rf)
                 resultFile = path * "/" * rf
-                solutionFound = occursin("SolutionFound", read(resultFile, String)) ? Main.SolutionFound : Main.isOptimal
+                solutionFound = occursin("SolutionFound", read(resultFile, String)) ? Main.SolutionFound : Main.SolutionFound
                 if solutionFound
                     results[folderCount, fileCount] = solveTime
                     solveTime > maxSolveTime && (maxSolveTime = solveTime)
@@ -189,7 +189,7 @@ function resultsArray(outputFile::String)
             path = resultFolder * method * "/" * inst
             if isfile(path)
                 include(path); print(fout, " & ", round(solveTime, digits=2), " & ")
-                solutionFound = occursin("SolutionFound", read(path, String)) ? Main.SolutionFound : Main.isOptimal
+                solutionFound = occursin("SolutionFound", read(path, String)) ? Main.SolutionFound : Main.SolutionFound
                 solutionFound && print(fout, "\$\\times\$")
             else; print(fout, " & - & -")
             end

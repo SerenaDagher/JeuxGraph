@@ -94,10 +94,10 @@ function cplexSolve(n::Int, m::Int, grid::Array{Int,2})
     optimize!(m_model)
     solveTime = time() - startTime
 
-    isOptimal = primal_status(m_model) == MOI.FEASIBLE_POINT
+    SolutionFound = primal_status(m_model) == MOI.FEASIBLE_POINT
 
     sol = zeros(Int,n,m)
-    if isOptimal
+    if SolutionFound
         x_val = value.(x)
         for i in 1:n, j in 1:m
             for k in 1:maxVal
@@ -106,7 +106,7 @@ function cplexSolve(n::Int, m::Int, grid::Array{Int,2})
         end
     end
 
-    return isOptimal, solveTime, sol
+    return SolutionFound, solveTime, sol
 end
 
 function heuristicSolve(n::Int, m::Int, grid::Matrix{Int})
@@ -297,8 +297,8 @@ function solveDataSet(dataFolder::String="data/",
                 global SolutionFound = false
                 global isValid = false
                 include(outputFile)
-                if !occursin("SolutionFound", read(outputFile, String)) && isdefined(Main, :isOptimal)
-                    SolutionFound = Main.isOptimal
+                if !occursin("SolutionFound", read(outputFile, String)) && isdefined(Main, :SolutionFound)
+                    SolutionFound = Main.SolutionFound
                 end
                 local rowValid = method == "heuristic" ? isValid : SolutionFound
                 if method == "heuristic"

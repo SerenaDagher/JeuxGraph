@@ -13,16 +13,16 @@ end
 function testSolve(path::String = "data/instanceTest.txt")
     println("\n=== Test cplexSolve ===")
     n, m, grid = readInputFile(path)
-    isOptimal, solveTime, sol = cplexSolve(n, m, grid)
-    println("Solution found: ", isOptimal, "  |  Time: ", round(solveTime, digits=4), "s")
-    if isOptimal
+    SolutionFound, solveTime, sol = cplexSolve(n, m, grid)
+    println("Solution found: ", SolutionFound, "  |  Time: ", round(solveTime, digits=4), "s")
+    if SolutionFound
         println("\nSolution:")
         displaySolution(n, m, sol)
         println("Valid: ", checkSolution(n, m, sol))
     else
         println("No solution found.")
     end
-    return isOptimal, solveTime, sol
+    return SolutionFound, solveTime, sol
 end
 
 function testHeuristic(path::String = "data/instanceTest.txt")
