@@ -151,7 +151,3 @@ julia> solveDataSet()      # résout et écrit les résultats dans res/
 
 ---
 
-## Rapports
-
-- `rapport_lightup.pdf`
-- `rapport_filling.pdf`
