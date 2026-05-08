@@ -123,62 +123,217 @@ function cplexSolve(n::Int, m::Int, grid::Array{Int,2})
 end
 
 # ---------------------------------------------------------------------------
-# Heuristique gloutonne fiable (zones exactes)
+# Heuristique avec backtracking et verification locale
 # ---------------------------------------------------------------------------
-function heuristicSolve(n::Int, m::Int, grid::Array{Int,2})
-
+function heuristicSolve(n::Int, m::Int, grid::Matrix{Int})
     startTime = time()
+    TIME_LIMIT = 5.0
+
     sol = copy(grid)
-    remaining_cells = [(i,j) for i in 1:n, j in 1:m if sol[i,j] == 0]
+    maxK = n * m
 
-    maxVal = maximum(grid)
-    maxVal = max(maxVal,1)
+    # ------------------------------------------------------------
+    # Voisinage
+    # ------------------------------------------------------------
+    directions = [(-1,0), (1,0), (0,-1), (0,1)]
 
-    function bfs_zone(start::Tuple{Int,Int}, free_cells::Set{Tuple{Int,Int}})
-        visited = Set([start])
-        queue = [start]
+    function neighbors(i::Int, j::Int)
+        result = Tuple{Int,Int}[]
+        for (di, dj) in directions
+            ni, nj = i + di, j + dj
+            if 1 <= ni <= n && 1 <= nj <= m
+                push!(result, (ni, nj))
+            end
+        end
+        return result
+    end
+
+    # ------------------------------------------------------------
+    # Composante connexe d'une valeur donnée
+    # ------------------------------------------------------------
+    function getComponent(mat::Matrix{Int}, startCell::Tuple{Int,Int}, value::Int)
+        visited = Set{Tuple{Int,Int}}()
+        queue = [startCell]
+        push!(visited, startCell)
+
         while !isempty(queue)
-            ci,cj = popfirst!(queue)
-            for (ni,nj) in getNeighbors(n,m,ci,cj)
-                if (ni,nj) in free_cells && !((ni,nj) in visited)
-                    push!(visited,(ni,nj))
-                    push!(queue,(ni,nj))
+            ci, cj = popfirst!(queue)
+
+            for nb in neighbors(ci, cj)
+                ni, nj = nb
+                if mat[ni, nj] == value && !(nb in visited)
+                    push!(visited, nb)
+                    push!(queue, nb)
                 end
             end
         end
+
         return visited
     end
 
-    free_cells = Set(remaining_cells)
+    # ------------------------------------------------------------
+    # Toutes les composantes d'une valeur
+    # ------------------------------------------------------------
+    function getAllComponents(mat::Matrix{Int}, value::Int)
+        seen = falses(n, m)
+        components = Vector{Vector{Tuple{Int,Int}}}()
 
-    # placer les chiffres du plus grand au plus petit
-    for k in maxVal:-1:1
-        assigned = true
-        while assigned
-            assigned = false
-            for cell in collect(free_cells)
-                zone = bfs_zone(cell, free_cells)
-                length(zone) >= k || continue
-                # Prendre exactement k cases
-                zone_list = collect(zone)[1:k]
-                for (i,j) in zone_list
-                    sol[i,j] = k
-                    delete!(free_cells, (i,j))
+        for i in 1:n, j in 1:m
+            if seen[i,j] || mat[i,j] != value
+                continue
+            end
+
+            component = Tuple{Int,Int}[]
+            queue = [(i,j)]
+            seen[i,j] = true
+
+            while !isempty(queue)
+                ci, cj = popfirst!(queue)
+                push!(component, (ci,cj))
+
+                for (ni,nj) in neighbors(ci,cj)
+                    if !seen[ni,nj] && mat[ni,nj] == value
+                        seen[ni,nj] = true
+                        push!(queue, (ni,nj))
+                    end
                 end
-                assigned = true
-                break
+            end
+
+            push!(components, component)
+        end
+
+        return components
+    end
+
+    # ------------------------------------------------------------
+    # Une composante incomplete peut-elle encore grandir ?
+    # ------------------------------------------------------------
+    function hasEmptyNeighbor(mat::Matrix{Int}, component)
+        for (ci, cj) in component
+            for (ni, nj) in neighbors(ci, cj)
+                if mat[ni, nj] == 0
+                    return true
+                end
             end
         end
+        return false
     end
 
-    # remplir le reste par 1
-    for (i,j) in free_cells
-        sol[i,j] = 1
+    # ------------------------------------------------------------
+    # Verification locale apres un placement
+    # ------------------------------------------------------------
+    function localCheck(mat::Matrix{Int}, i::Int, j::Int, value::Int)
+        component = getComponent(mat, (i,j), value)
+        sizeComponent = length(component)
+
+        if sizeComponent > value
+            return false
+        end
+
+        if sizeComponent < value && !hasEmptyNeighbor(mat, component)
+            return false
+        end
+
+        return true
     end
 
+    # ------------------------------------------------------------
+    # Verification finale de toute la grille
+    # ------------------------------------------------------------
+    function globalCheck(mat::Matrix{Int})
+        # Toutes les cases doivent etre remplies
+        for i in 1:n, j in 1:m
+            mat[i,j] == 0 && return false
+        end
+
+        # Chaque composante de valeur k doit avoir exactement k cases
+        for value in 1:maximum(mat)
+            components = getAllComponents(mat, value)
+            for component in components
+                length(component) == value || return false
+            end
+        end
+
+        return true
+    end
+
+    # ------------------------------------------------------------
+    # Ordre des cases vides : les plus contraintes d'abord
+    # ------------------------------------------------------------
+    emptyCells = [(i,j) for i in 1:n, j in 1:m if grid[i,j] == 0]
+
+    function fixedNeighborCount(cell)
+        i, j = cell
+        countFixed = 0
+
+        for (ni, nj) in neighbors(i, j)
+            if grid[ni, nj] > 0
+                countFixed += 1
+            end
+        end
+
+        return -countFixed
+    end
+
+    sort!(emptyCells, by=fixedNeighborCount)
+
+    # ------------------------------------------------------------
+    # Ordre des valeurs : d'abord les valeurs voisines
+    # ------------------------------------------------------------
+    function possibleValues(cell)
+        i, j = cell
+        nearbyValues = Set{Int}()
+
+        for (ni, nj) in neighbors(i, j)
+            if sol[ni, nj] > 0
+                push!(nearbyValues, sol[ni, nj])
+            end
+        end
+
+        values = collect(nearbyValues)
+
+        for k in 1:maxK
+            if !(k in nearbyValues)
+                push!(values, k)
+            end
+        end
+
+        return values
+    end
+
+    # ------------------------------------------------------------
+    # Backtracking
+    # ------------------------------------------------------------
+    function search(pos::Int)
+        if time() - startTime > TIME_LIMIT
+            return false
+        end
+
+        if pos > length(emptyCells)
+            return globalCheck(sol)
+        end
+
+        i, j = emptyCells[pos]
+
+        for value in possibleValues((i,j))
+            sol[i,j] = value
+
+            if localCheck(sol, i, j, value)
+                if search(pos + 1)
+                    return true
+                end
+            end
+
+            sol[i,j] = 0
+        end
+
+        return false
+    end
+
+    success = search(1)
     solveTime = time() - startTime
-    isValid = checkSolution(n,m,sol)
-    return isValid, solveTime, sol
+
+    return success, solveTime, sol
 end
 
 # ---------------------------------------------------------------------------
