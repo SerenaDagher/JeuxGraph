@@ -123,217 +123,161 @@ function cplexSolve(n::Int, m::Int, grid::Array{Int,2})
 end
 
 # ---------------------------------------------------------------------------
-# Heuristique avec backtracking et verification locale
+# Heuristique avec backtracking
+# Sélection de case  : dynamique — la case avec le plus de voisins remplis
+# Sélection de valeur: voisines d'abord (croissant), puis 1..maxK croissant
+# Élagage            : flood-fill sur la région placée ET ses voisines
 # ---------------------------------------------------------------------------
 function heuristicSolve(n::Int, m::Int, grid::Matrix{Int})
     startTime = time()
-    TIME_LIMIT = 5.0
+    TIME_LIMIT = 30.0
 
-    sol = copy(grid)
-    maxK = n * m
+    sol  = copy(grid)
+    maxK = max(maximum(grid), 9)
 
     # ------------------------------------------------------------
-    # Voisinage
+    # Voisins orthogonaux
     # ------------------------------------------------------------
-    directions = [(-1,0), (1,0), (0,-1), (0,1)]
-
-    function neighbors(i::Int, j::Int)
+    function nbrs(i::Int, j::Int)
         result = Tuple{Int,Int}[]
-        for (di, dj) in directions
-            ni, nj = i + di, j + dj
-            if 1 <= ni <= n && 1 <= nj <= m
-                push!(result, (ni, nj))
-            end
+        for (di, dj) in ((-1,0),(1,0),(0,-1),(0,1))
+            ni, nj = i+di, j+dj
+            1 <= ni <= n && 1 <= nj <= m && push!(result, (ni, nj))
         end
         return result
     end
 
     # ------------------------------------------------------------
-    # Composante connexe d'une valeur donnée
+    # Vérifie qu'une région de valeur v contenant (si,sj) est encore viable:
+    #   • taille ≤ v
+    #   • si taille < v, il existe au moins (v - taille) cases libres
+    #     accessibles depuis la région (flood-fill dans l'espace libre)
     # ------------------------------------------------------------
-    function getComponent(mat::Matrix{Int}, startCell::Tuple{Int,Int}, value::Int)
-        visited = Set{Tuple{Int,Int}}()
-        queue = [startCell]
-        push!(visited, startCell)
+    function regionOK(si, sj, v)
+        visited = falses(n, m)
+        queue   = [(si, sj)]
+        visited[si, sj] = true
+        sz       = 0
+        boundary = Tuple{Int,Int}[]   # cases libres adjacentes à la région
 
         while !isempty(queue)
             ci, cj = popfirst!(queue)
-
-            for nb in neighbors(ci, cj)
-                ni, nj = nb
-                if mat[ni, nj] == value && !(nb in visited)
-                    push!(visited, nb)
-                    push!(queue, nb)
+            sz += 1
+            for (ni, nj) in nbrs(ci, cj)
+                visited[ni, nj] && continue
+                if sol[ni, nj] == v
+                    visited[ni, nj] = true
+                    push!(queue, (ni, nj))
+                elseif sol[ni, nj] == 0
+                    visited[ni, nj] = true   # marquer pour éviter doublons
+                    push!(boundary, (ni, nj))
                 end
             end
         end
 
-        return visited
-    end
+        sz > v && return false
+        sz == v && return true
 
-    # ------------------------------------------------------------
-    # Toutes les composantes d'une valeur
-    # ------------------------------------------------------------
-    function getAllComponents(mat::Matrix{Int}, value::Int)
-        seen = falses(n, m)
-        components = Vector{Vector{Tuple{Int,Int}}}()
+        # Flood-fill depuis les cases libres adjacentes
+        needed    = v - sz
+        reachable = length(boundary)
+        reachable < needed || return true   # déjà assez
+        isempty(boundary) && return false
 
-        for i in 1:n, j in 1:m
-            if seen[i,j] || mat[i,j] != value
-                continue
-            end
-
-            component = Tuple{Int,Int}[]
-            queue = [(i,j)]
-            seen[i,j] = true
-
-            while !isempty(queue)
-                ci, cj = popfirst!(queue)
-                push!(component, (ci,cj))
-
-                for (ni,nj) in neighbors(ci,cj)
-                    if !seen[ni,nj] && mat[ni,nj] == value
-                        seen[ni,nj] = true
-                        push!(queue, (ni,nj))
-                    end
-                end
-            end
-
-            push!(components, component)
-        end
-
-        return components
-    end
-
-    # ------------------------------------------------------------
-    # Une composante incomplete peut-elle encore grandir ?
-    # ------------------------------------------------------------
-    function hasEmptyNeighbor(mat::Matrix{Int}, component)
-        for (ci, cj) in component
-            for (ni, nj) in neighbors(ci, cj)
-                if mat[ni, nj] == 0
-                    return true
+        flood = copy(boundary)
+        while !isempty(flood)
+            ci, cj = popfirst!(flood)
+            for (ni, nj) in nbrs(ci, cj)
+                if !visited[ni, nj] && sol[ni, nj] == 0
+                    visited[ni, nj] = true
+                    reachable += 1
+                    reachable >= needed && return true
+                    push!(flood, (ni, nj))
                 end
             end
         end
+
         return false
     end
 
     # ------------------------------------------------------------
-    # Verification locale apres un placement
+    # Après avoir posé sol[i,j] = v, vérifie :
+    #   1. la région v contenant (i,j)
+    #   2. toutes les régions voisines de valeur différente
     # ------------------------------------------------------------
-    function localCheck(mat::Matrix{Int}, i::Int, j::Int, value::Int)
-        component = getComponent(mat, (i,j), value)
-        sizeComponent = length(component)
-
-        if sizeComponent > value
-            return false
+    function placementOK(i, j, v)
+        regionOK(i, j, v) || return false
+        checked = Set{Int}((v, 0))
+        for (ni, nj) in nbrs(i, j)
+            w = sol[ni, nj]
+            w in checked && continue
+            push!(checked, w)
+            regionOK(ni, nj, w) || return false
         end
-
-        if sizeComponent < value && !hasEmptyNeighbor(mat, component)
-            return false
-        end
-
         return true
     end
 
     # ------------------------------------------------------------
-    # Verification finale de toute la grille
+    # Vérification finale
     # ------------------------------------------------------------
-    function globalCheck(mat::Matrix{Int})
-        # Toutes les cases doivent etre remplies
+    function globalOK()
         for i in 1:n, j in 1:m
-            mat[i,j] == 0 && return false
+            sol[i,j] == 0 && return false
         end
-
-        # Chaque composante de valeur k doit avoir exactement k cases
-        for value in 1:maximum(mat)
-            components = getAllComponents(mat, value)
-            for component in components
-                length(component) == value || return false
-            end
-        end
-
-        return true
+        return checkSolution(n, m, sol)
     end
 
     # ------------------------------------------------------------
-    # Ordre des cases vides : les plus contraintes d'abord
+    # Choix dynamique : case non assignée avec le plus de voisins remplis
     # ------------------------------------------------------------
-    emptyCells = [(i,j) for i in 1:n, j in 1:m if grid[i,j] == 0]
+    function pickCell(unassigned::Set{Tuple{Int,Int}})
+        best       = first(unassigned)
+        best_score = count(nb -> sol[nb[1],nb[2]] > 0, nbrs(best...))
+        for cell in unassigned
+            score = count(nb -> sol[nb[1],nb[2]] > 0, nbrs(cell...))
+            score > best_score && (best = cell; best_score = score)
+        end
+        return best
+    end
 
-    function fixedNeighborCount(cell)
+    # ------------------------------------------------------------
+    # Ordre des valeurs pour (i,j) :
+    #   1. valeurs des voisins actuels (croissant) → étendre une région
+    #   2. valeurs restantes 1..maxK (croissant)   → petits chiffres en premier
+    # ------------------------------------------------------------
+    function orderedValues(i, j)
+        nearby     = sort(unique(sol[ni,nj] for (ni,nj) in nbrs(i,j) if sol[ni,nj] > 0))
+        nearby_set = Set(nearby)
+        rest       = [k for k in 1:maxK if k ∉ nearby_set]
+        return vcat(nearby, rest)
+    end
+
+    # ------------------------------------------------------------
+    # Backtracking avec sélection dynamique de la case
+    # ------------------------------------------------------------
+    function search(unassigned::Set{Tuple{Int,Int}})
+        time() - startTime > TIME_LIMIT && return false
+        isempty(unassigned)             && return globalOK()
+
+        cell = pickCell(unassigned)
         i, j = cell
-        countFixed = 0
+        delete!(unassigned, cell)
 
-        for (ni, nj) in neighbors(i, j)
-            if grid[ni, nj] > 0
-                countFixed += 1
+        for v in orderedValues(i, j)
+            sol[i,j] = v
+            if placementOK(i, j, v) && search(unassigned)
+                return true
             end
-        end
-
-        return -countFixed
-    end
-
-    sort!(emptyCells, by=fixedNeighborCount)
-
-    # ------------------------------------------------------------
-    # Ordre des valeurs : d'abord les valeurs voisines
-    # ------------------------------------------------------------
-    function possibleValues(cell)
-        i, j = cell
-        nearbyValues = Set{Int}()
-
-        for (ni, nj) in neighbors(i, j)
-            if sol[ni, nj] > 0
-                push!(nearbyValues, sol[ni, nj])
-            end
-        end
-
-        values = collect(nearbyValues)
-
-        for k in 1:maxK
-            if !(k in nearbyValues)
-                push!(values, k)
-            end
-        end
-
-        return values
-    end
-
-    # ------------------------------------------------------------
-    # Backtracking
-    # ------------------------------------------------------------
-    function search(pos::Int)
-        if time() - startTime > TIME_LIMIT
-            return false
-        end
-
-        if pos > length(emptyCells)
-            return globalCheck(sol)
-        end
-
-        i, j = emptyCells[pos]
-
-        for value in possibleValues((i,j))
-            sol[i,j] = value
-
-            if localCheck(sol, i, j, value)
-                if search(pos + 1)
-                    return true
-                end
-            end
-
             sol[i,j] = 0
         end
 
+        push!(unassigned, cell)
         return false
     end
 
-    success = search(1)
-    solveTime = time() - startTime
-
-    return success, solveTime, sol
+    unassigned = Set{Tuple{Int,Int}}((i,j) for i in 1:n, j in 1:m if grid[i,j] == 0)
+    success    = search(unassigned)
+    return success, time() - startTime, sol
 end
 
 # ---------------------------------------------------------------------------
@@ -357,7 +301,7 @@ function solveDataSet(dataFolder::String="data/",
         isdir(folder) || mkpath(folder)
     end
 
-    global isOptimal = false
+    global SolutionFound = false
     global solveTime = -1.0
     global isValid = false
 
@@ -386,20 +330,24 @@ function solveDataSet(dataFolder::String="data/",
 
                     open(outputFile, "w") do fout
                         println(fout, "solveTime = ", resolutionTime)
-                        println(fout, "isOptimal = ", solved)
+                        println(fout, "SolutionFound = ", solved)
                         if method == "heuristic"
                             println(fout, "isValid = ", solved)
                         end
                     end
                 end
 
+                global SolutionFound = false
                 global isValid = false
                 include(outputFile)
-                local rowValid = method == "heuristic" ? isValid : isOptimal
+                if !occursin("SolutionFound", read(outputFile, String)) && isdefined(Main, :isOptimal)
+                    SolutionFound = Main.isOptimal
+                end
+                local rowValid = method == "heuristic" ? isValid : SolutionFound
                 if method == "heuristic"
                     println(method, " valid: ", isValid)
                 else
-                    println(method, " solution found: ", isOptimal)
+                    println(method, " solution found: ", SolutionFound)
                 end
                 println(method, " time: ", round(solveTime, sigdigits=2), "s\n")
 
@@ -408,7 +356,7 @@ function solveDataSet(dataFolder::String="data/",
                     string(n),
                     string(m),
                     csvEscape(method),
-                    string(isOptimal),
+                    string(SolutionFound),
                     string(rowValid),
                     string(solveTime)
                 ], ","))

@@ -1,3 +1,3 @@
-solveTime = 5.000999927520752
-isOptimal = false
-isValid = false
+solveTime = 3.809999942779541
+SolutionFound = true
+isValid = true

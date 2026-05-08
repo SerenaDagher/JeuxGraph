@@ -169,7 +169,9 @@ function performanceDiagram(outputFile::String)
             for rf in filter(x->occursin(".txt",x), readdir(path))
                 fileCount += 1
                 include(path * "/" * rf)
-                if isOptimal
+                resultFile = path * "/" * rf
+                solutionFound = occursin("SolutionFound", read(resultFile, String)) ? Main.SolutionFound : Main.isOptimal
+                if solutionFound
                     results[folderCount, fileCount] = solveTime
                     solveTime > maxSolveTime && (maxSolveTime = solveTime)
                 end
@@ -215,7 +217,7 @@ function resultsArray(outputFile::String)
     header *= "}\n\t\\hline\n"
     for f in folderName; header *= " & \\multicolumn{2}{c}{\\textbf{$f}}"; end
     header *= "\\\\\n\\textbf{Instance}"
-    for _ in folderName; header *= " & \\textbf{Time (s)} & \\textbf{Optimal?}"; end
+    for _ in folderName; header *= " & \\textbf{Time (s)} & \\textbf{Solution found?}"; end
     header *= "\\\\\\hline\n"
     footer = "\\hline\\end{tabular}\n\\end{center}\n\n"
     println(fout, header)
@@ -227,7 +229,8 @@ function resultsArray(outputFile::String)
             path = resultFolder * method * "/" * inst
             if isfile(path)
                 include(path); print(fout, " & ", round(solveTime, digits=2), " & ")
-                isOptimal && print(fout, "\$\\times\$")
+                solutionFound = occursin("SolutionFound", read(path, String)) ? Main.SolutionFound : Main.isOptimal
+                solutionFound && print(fout, "\$\\times\$")
             else; print(fout, " & - & -")
             end
         end

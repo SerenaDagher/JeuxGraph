@@ -9,12 +9,11 @@ include("solutions.jl")
 
 """
 Generate a random Filling instance from a known solution.
-  - One clue per region is always revealed.
-  - Each remaining cell in the region is revealed with probability `density`.
+  - Exactly one clue per region is revealed.
 
 Returns: n, m, grid
 """
-function generateInstance(n::Int, m::Int; density::Float64 = 0.0)
+function generateInstance(n::Int, m::Int)
     haskey(KNOWN_SOLUTIONS, (n, m)) ||
         error("No known solution for $(n)×$(m). Add one to src/solutions.jl.")
 
@@ -45,12 +44,6 @@ function generateInstance(n::Int, m::Int; density::Float64 = 0.0)
         # Always reveal one clue per region
         clue = rand(comp)
         grid[clue[1], clue[2]] = v
-
-        # Optionally reveal more cells
-        for cell in comp
-            cell == clue && continue
-            rand() < density && (grid[cell[1], cell[2]] = v)
-        end
     end
 
     return n, m, grid
@@ -89,8 +82,8 @@ function generateDataSet(; clean::Bool = true)
         println("Deleted previous generated instances in ", dataFolder)
     end
 
-    sizes      = [3, 4, 5, 6]
-    nbInstances = 5
+    sizes      = [3, 4, 5, 6,7, 8, 9, 10, 11, 12, 13, 14, 15]
+    nbInstances = 50
 
     for n in sizes
         haskey(KNOWN_SOLUTIONS, (n, n)) ||
