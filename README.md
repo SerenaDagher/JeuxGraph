@@ -23,7 +23,7 @@ JeuxGraph/
 ├── LightUp/
 │   ├── main.jl
 │   ├── data/          # instances .txt
-│   ├── res/           # résultats CPLEX et heuristique
+│   ├── res/           # résultats CPLEX
 │   └── src/
 │       ├── io.jl
 │       ├── resolution.jl
@@ -36,10 +36,9 @@ JeuxGraph/
     └── src/
         ├── io.jl
         ├── resolution.jl
-        └── generation.jl
+        ├── generation.jl
+        └── solutions.jl
 ```
-
-Chaque jeu suit la même organisation : un point d'entrée `main.jl`, un module de lecture/affichage, un module de résolution et un module de génération d'instances.
 
 ---
 
@@ -91,9 +90,13 @@ Placer des lampes sur une grille. Chaque case blanche doit être éclairée. Deu
 
 `.` = case blanche, `N` = case noire, `0`–`4` = case noire numérotée.
 
+### Génération
+
+Les instances sont générées aléatoirement. Cases noires et numéros sont placés en deux passes séparées pour garantir la cohérence locale. Certaines instances restent infaisables à cause de contradictions entre cases noires voisines — c'est inévitable avec une génération purement aléatoire.
+
 ### Résultats
 
-Toutes les instances réelles testées sont résolues, y compris des grilles **50×50 en 0.038s**. La taille n'est pas le facteur limitant — c'est la faisabilité de l'instance qui détermine si une solution existe.
+Toutes les instances réelles testées sont résolues, y compris des grilles **50×50 en 0.038s**. La taille seule ne détermine pas la difficulté : c'est la densité et la disposition des cases noires qui conditionnent le temps de résolution.
 
 ---
 
@@ -101,7 +104,7 @@ Toutes les instances réelles testées sont résolues, y compris des grilles **5
 
 ### Règles
 
-Remplir une grille avec des chiffres. Chaque chiffre `k` doit former une zone **connexe** de exactement `k` cases de valeur `k`. Des murs peuvent séparer des cases adjacentes.
+Remplir une grille avec des chiffres. Chaque chiffre `k` doit former une zone **connexe** de exactement `k` cases de valeur `k`.
 
 ### Modèle PLNE
 
@@ -112,9 +115,7 @@ Remplir une grille avec des chiffres. Chaque chiffre `k` doit former une zone **
 
 ### Callback CPLEX
 
-La contrainte de connexité ne peut pas s'écrire directement dans le modèle sans un nombre exponentiel de contraintes. On utilise un **callback** : à chaque solution entière candidate, on vérifie les composantes connexes par BFS et on ajoute une coupe si une composante a la mauvaise taille.
-
-Deux types de coupes selon la situation :
+La contrainte de connexité s'applique via un **callback** : à chaque solution entière candidate, le BFS vérifie toutes les composantes connexes et ajoute une coupe si une composante a la mauvaise taille.
 
 ```
 Composante C trop grande (|C| > k) :
@@ -127,30 +128,21 @@ Composante C trop petite (|C| < k) :
 ### Format d'instance
 
 ```
-0, 0, 0, 0, 4
-4, 0, 0, 3, 0
-0, 0, 5, 0, 0
-0, 5, 2, 4, 0
-0, 0, 0, 0, 2
-WALLS
-H 3 3
-V 4 2
-V 4 3
+4, 2, 5, 0, 0, 2, 0, ...
+0, 0, 0, 0, 0, 6, 0, ...
 ```
 
-`0` = case vide, valeur > 0 = case pré-remplie.  
-`H r c` = mur horizontal entre (r,c) et (r+1,c).  
-`V r c` = mur vertical entre (r,c) et (r,c+1).
+`0` = case vide, valeur > 0 = case pré-remplie. Les voisins sont les quatre cases adjacentes orthogonalement.
 
-### Résultats
+### Génération
 
-Les instances 4×4 à 6×6 sont résolues en moins de 0.25s. Les instances générées aléatoirement sont souvent infaisables — c'est la faisabilité, et non la taille, qui conditionne la résolution.
+Les instances sont construites à partir de **solutions valides connues** stockées dans `solutions.jl`. Pour chaque composante connexe de la solution, une case est tirée aléatoirement comme indice pré-rempli. Cette méthode garantit que toutes les instances générées sont **faisables**.
+
+Le dataset couvre les tailles **3×3 à 12×12**, avec **50 instances par taille**.
 
 ---
 
-## Génération d'instances
-
-Les deux jeux disposent d'un générateur aléatoire produisant des datasets de tailles variées. Les instances générées ne sont pas garanties faisables — certaines contiennent des contradictions locales inévitables avec une génération purement aléatoire.
+## Génération du dataset
 
 ```julia
 julia> generateDataSet()   # génère les instances dans data/
@@ -160,8 +152,6 @@ julia> solveDataSet()      # résout et écrit les résultats dans res/
 ---
 
 ## Rapports
-
-Les rapports complets (modélisation, implémentation, résultats, analyse) sont disponibles dans le dépôt :
 
 - `rapport_lightup.pdf`
 - `rapport_filling.pdf`
