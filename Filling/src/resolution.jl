@@ -17,25 +17,10 @@ function isIntegerPoint(cb_data::CPLEX.CallbackContext, context_id::Clong)
     return context_id == CPLEX.CPX_CALLBACKCONTEXT_CANDIDATE
 end
 
-# Renvoie les voisins accessibles d'une case (i,j) en respectant les murs
-function getNeighbors(n::Int, m::Int, walls::Set{Tuple{Tuple{Int,Int},Tuple{Int,Int}}}, i::Int, j::Int)
-    neighbors = Tuple{Int,Int}[]
-    for (di,dj) in [(0,1),(1,0),(0,-1),(-1,0)]
-        ni, nj = i+di, j+dj
-        if 1 <= ni <= n && 1 <= nj <= m
-            if !(( (i,j),(ni,nj) ) in walls || ( (ni,nj),(i,j) ) in walls)
-                push!(neighbors, (ni,nj))
-            end
-        end
-    end
-    return neighbors
-end
-
 # ---------------------------------------------------------------------------
 # CPLEX PLNE + callback pour la connexité
 # ---------------------------------------------------------------------------
-function cplexSolve(n::Int, m::Int, grid::Array{Int,2},
-                    walls::Set{Tuple{Tuple{Int,Int},Tuple{Int,Int}}}=Set())
+function cplexSolve(n::Int, m::Int, grid::Array{Int,2})
 
     maxVal = max(maximum(grid), min(n*m,9))
     m_model = Model(CPLEX.Optimizer)
@@ -75,7 +60,7 @@ function cplexSolve(n::Int, m::Int, grid::Array{Int,2},
                     while !isempty(queue)
                         ci,cj = popfirst!(queue)
                         push!(component,(ci,cj))
-                        for (ni,nj) in getNeighbors(n,m,walls,ci,cj)
+                        for (ni,nj) in getNeighbors(n,m,ci,cj)
                             if !visited[ni,nj] && x_val[ni,nj,k] > 0.5
                                 visited[ni,nj] = true
                                 push!(queue,(ni,nj))
@@ -87,9 +72,6 @@ function cplexSolve(n::Int, m::Int, grid::Array{Int,2},
                     sz == k && continue  # composante correcte
 
                     if sz > k
-                        # Composante trop grande :
-                        # on interdit seulement cette composante exacte,
-                        # pas toutes les façons de garder k cases dedans.
                         cstr = @build_constraint(
                             sum(x[ci, cj, k] for (ci, cj) in component) <= sz - 1
                         )
@@ -98,7 +80,7 @@ function cplexSolve(n::Int, m::Int, grid::Array{Int,2},
                         # trop petite : au moins une case doit s'étendre
                         neighbors_C = Set{Tuple{Int,Int}}()
                         for (ci,cj) in component
-                            for (ni,nj) in getNeighbors(n,m,walls,ci,cj)
+                            for (ni,nj) in getNeighbors(n,m,ci,cj)
                                 x_val[ni,nj,k] < 0.5 && push!(neighbors_C,(ni,nj))
                             end
                         end
@@ -141,10 +123,9 @@ function cplexSolve(n::Int, m::Int, grid::Array{Int,2},
 end
 
 # ---------------------------------------------------------------------------
-# Heuristique gloutonne fiable (zones exactes + murs)
+# Heuristique gloutonne fiable (zones exactes)
 # ---------------------------------------------------------------------------
-function heuristicSolve(n::Int, m::Int, grid::Array{Int,2},
-                        walls::Set{Tuple{Tuple{Int,Int},Tuple{Int,Int}}}=Set())
+function heuristicSolve(n::Int, m::Int, grid::Array{Int,2})
 
     startTime = time()
     sol = copy(grid)
@@ -153,13 +134,12 @@ function heuristicSolve(n::Int, m::Int, grid::Array{Int,2},
     maxVal = maximum(grid)
     maxVal = max(maxVal,1)
 
-    # BFS interne respectant les murs
     function bfs_zone(start::Tuple{Int,Int}, free_cells::Set{Tuple{Int,Int}})
         visited = Set([start])
         queue = [start]
         while !isempty(queue)
             ci,cj = popfirst!(queue)
-            for (ni,nj) in getNeighbors(n,m,walls,ci,cj)
+            for (ni,nj) in getNeighbors(n,m,ci,cj)
                 if (ni,nj) in free_cells && !((ni,nj) in visited)
                     push!(visited,(ni,nj))
                     push!(queue,(ni,nj))
@@ -197,7 +177,7 @@ function heuristicSolve(n::Int, m::Int, grid::Array{Int,2},
     end
 
     solveTime = time() - startTime
-    isValid = checkSolution(n,m,sol,walls)
+    isValid = checkSolution(n,m,sol)
     return isValid, solveTime, sol
 end
 
@@ -229,12 +209,12 @@ function solveDataSet(dataFolder::String="data/",
     csvEscape(value) = "\"" * replace(string(value), "\"" => "\"\"") * "\""
 
     open(csvFile, "w") do csv
-        println(csv, "instance,n,m,method,solved,valid,solve_time,walls")
+        println(csv, "instance,n,m,method,solved,valid,solve_time")
 
         for file in sort(filter(x -> endswith(x, ".txt"), readdir(dataFolder)))
             inputFile = joinpath(dataFolder, file)
             println("-- Resolution of ", file)
-            n, m, grid, walls = readInputFile(inputFile)
+            n, m, grid = readInputFile(inputFile)
 
             for method in methods
                 outputFile = joinpath(resFolder, method, file)
@@ -244,9 +224,9 @@ function solveDataSet(dataFolder::String="data/",
                     local solved = false
 
                     if method == "cplex"
-                        solved, resolutionTime, _ = cplexSolve(n, m, grid, walls)
+                        solved, resolutionTime, _ = cplexSolve(n, m, grid)
                     elseif method == "heuristic"
-                        solved, resolutionTime, _ = heuristicSolve(n, m, grid, walls)
+                        solved, resolutionTime, _ = heuristicSolve(n, m, grid)
                     end
 
                     open(outputFile, "w") do fout
@@ -275,8 +255,7 @@ function solveDataSet(dataFolder::String="data/",
                     csvEscape(method),
                     string(isOptimal),
                     string(rowValid),
-                    string(solveTime),
-                    string(length(walls))
+                    string(solveTime)
                 ], ","))
             end
         end

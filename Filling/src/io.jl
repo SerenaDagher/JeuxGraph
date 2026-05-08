@@ -1,30 +1,21 @@
-# io.jl for Filling — with wall support
+# io.jl for Filling
 
 using JuMP
 using Plots
 import GR
 
 # ---------------------------------------------------------------------------
-# Wall helpers
+# Neighbor helper
 # ---------------------------------------------------------------------------
 
 """
-Return true if there is a wall between (i1,j1) and (i2,j2).
-Walls are stored as canonical pairs (smaller index first).
+Return all orthogonal neighbours of (i,j) within the grid.
 """
-function hasWall(walls::Set, i1::Int, j1::Int, i2::Int, j2::Int)
-    return ((i1,j1),(i2,j2)) in walls || ((i2,j2),(i1,j1)) in walls
-end
-
-"""
-Return all orthogonal neighbours of (i,j) that are NOT separated by a wall.
-"""
-function getNeighbors(n::Int, m::Int, walls::Set, i::Int, j::Int)
+function getNeighbors(n::Int, m::Int, i::Int, j::Int)
     nbrs = Tuple{Int,Int}[]
     for (di, dj) in [(-1,0),(1,0),(0,-1),(0,1)]
         ni, nj = i+di, j+dj
-        1<=ni<=n && 1<=nj<=m           || continue
-        hasWall(walls, i, j, ni, nj)  && continue
+        1<=ni<=n && 1<=nj<=m || continue
         push!(nbrs, (ni, nj))
     end
     return nbrs
@@ -39,21 +30,17 @@ Read a Filling instance from a text file.
 
 Format:
   - One CSV row per grid line (0 = empty, k = pre-filled value k)
-  - Optional section starting with "WALLS":
-      H r c  →  horizontal wall between (r,c) and (r+1,c)
-      V r c  →  vertical   wall between (r,c) and (r,c+1)
 
-Returns: n, m, grid, walls
+Returns: n, m, grid
 """
 function readInputFile(inputFile::String)
     datafile = open(inputFile)
     data = readlines(datafile)
     close(datafile)
 
-    # Split at WALLS separator
+    # Ignore any WALLS section if present in old files
     sep = findfirst(l -> strip(l) == "WALLS", data)
     grid_lines = sep === nothing ? data : data[1:sep-1]
-    wall_lines = sep === nothing ? String[] : data[sep+1:end]
 
     n = length(grid_lines)
     m = length(split(grid_lines[1], ","))
@@ -66,20 +53,7 @@ function readInputFile(inputFile::String)
         end
     end
 
-    # Parse walls — stored as canonical pairs
-    walls = Set{Tuple{Tuple{Int,Int},Tuple{Int,Int}}}()
-    for line in wall_lines
-        parts = split(strip(line))
-        length(parts) == 3 || continue
-        r, c = parse(Int, parts[2]), parse(Int, parts[3])
-        if parts[1] == "H"                 # horizontal: (r,c)↔(r+1,c)
-            push!(walls, ((r,c),(r+1,c)))
-        elseif parts[1] == "V"             # vertical:   (r,c)↔(r,c+1)
-            push!(walls, ((r,c),(r,c+1)))
-        end
-    end
-
-    return n, m, grid, walls
+    return n, m, grid
 end
 
 # ---------------------------------------------------------------------------
@@ -87,34 +61,24 @@ end
 # ---------------------------------------------------------------------------
 
 """
-Display the initial Filling grid, showing walls as thick borders.
+Display the initial Filling grid.
   _  = empty cell
   k  = pre-filled cell
-  #  = vertical wall between columns
-  =  = horizontal wall between rows
 """
-function displayGrid(n::Int, m::Int, grid::Array{Int,2},
-                     walls::Set = Set())
-    vwall(i,j) = j < m && hasWall(walls, i, j, i, j+1)
-    hwall(i,j) = i < n && hasWall(walls, i, j, i+1, j)
-
-    # Top border
+function displayGrid(n::Int, m::Int, grid::Array{Int,2})
     println("+" * repeat("---+", m))
     for i in 1:n
-        # Cell row
         print("|")
         for j in 1:m
             v = grid[i, j]
             print(v == 0 ? " _ " : lpad(v, 2) * " ")
-            print(vwall(i,j) ? "#" : "|")
+            print("|")
         end
         println()
-        # Separator between rows i and i+1
         if i < n
             print("+")
             for j in 1:m
-                print(hwall(i,j) ? "===" : "---")
-                print("+")
+                print("---+")
             end
             println()
         end
@@ -123,27 +87,22 @@ function displayGrid(n::Int, m::Int, grid::Array{Int,2},
 end
 
 """
-Display the solved Filling grid, showing walls as thick borders.
+Display the solved Filling grid.
 """
-function displaySolution(n::Int, m::Int, sol::Array{Int,2},
-                          walls::Set = Set())
-    vwall(i,j) = j < m && hasWall(walls, i, j, i, j+1)
-    hwall(i,j) = i < n && hasWall(walls, i, j, i+1, j)
-
+function displaySolution(n::Int, m::Int, sol::Array{Int,2})
     println("+" * repeat("---+", m))
     for i in 1:n
         print("|")
         for j in 1:m
             v = sol[i, j]
             print(v == 0 ? " ? " : lpad(v, 2) * " ")
-            print(vwall(i,j) ? "#" : "|")
+            print("|")
         end
         println()
         if i < n
             print("+")
             for j in 1:m
-                print(hwall(i,j) ? "===" : "---")
-                print("+")
+                print("---+")
             end
             println()
         end
@@ -157,24 +116,22 @@ end
 
 """
 Check that a complete Filling solution is valid:
-every connected component (using only non-wall edges) of value v has exactly v cells.
+every connected component of value v has exactly v cells.
 """
-function checkSolution(n::Int, m::Int, sol::Array{Int,2},
-                        walls::Set = Set())
+function checkSolution(n::Int, m::Int, sol::Array{Int,2})
     visited = falses(n, m)
     for i in 1:n, j in 1:m
         visited[i, j] && continue
         v = sol[i, j]
         v == 0 && return false
 
-        # BFS through non-wall edges
         component = Tuple{Int,Int}[]
         queue = [(i, j)]
         visited[i, j] = true
         while !isempty(queue)
             ci, cj = popfirst!(queue)
             push!(component, (ci, cj))
-            for (ni, nj) in getNeighbors(n, m, walls, ci, cj)
+            for (ni, nj) in getNeighbors(n, m, ci, cj)
                 if !visited[ni, nj] && sol[ni, nj] == v
                     visited[ni, nj] = true
                     push!(queue, (ni, nj))
